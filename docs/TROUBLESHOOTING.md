@@ -10,6 +10,7 @@ npx expo start --clear
 
 ### "Unable to resolve module" エラー
 
+
 ```powershell
 Remove-Item -Recurse -Force node_modules
 npm install
