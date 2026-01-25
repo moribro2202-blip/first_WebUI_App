@@ -89,10 +89,12 @@ EXPO_PUBLIC_FIREBASE_APP_ID
 | `docs/coding-rules.md`            | コード   | コーディング規約                 |
 | `docs/uiux.md`                    | デザイン | UI/UX設計ルール                  |
 | `docs/TROUBLESHOOTING.md`         | 運用     | エラー対処法                     |
-| `.claude/skills/task-split/`      | スキル   | タスク分割                       |
-| `.claude/skills/git-commit/`      | スキル   | コミットメッセージ生成           |
-| `.claude/skills/appstore-review/` | スキル   | App Store審査対策                |
-| `.claude/skills/debugging-guide/` | スキル   | デバッグ・トラブルシューティング |
+| `.claude/skills/task-split/`        | スキル   | タスク分割                       |
+| `.claude/skills/git-commit/`        | スキル   | コミットメッセージ生成           |
+| `.claude/skills/appstore-review/`   | スキル   | App Store審査対策                |
+| `.claude/skills/debugging-guide/`   | スキル   | デバッグ・トラブルシューティング |
+| `.claude/skills/support-developer/` | スキル   | 開発者応援・X問い合わせ機能      |
+| `.claude/skills/revenuecat-setup/`  | スキル   | RevenueCat + App Store Connect 課金設定 |
 
 > ルールの説明を踏まえ、必要と判断したルールは積極的に事前確認すること。
 >

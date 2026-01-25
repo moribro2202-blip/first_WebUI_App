@@ -53,6 +53,23 @@ eas build:configure
 
 ## ビルド
 
+> **重要**: `eas build` はビルドを作成するだけです。
+> TestFlight / Google Play にアップロードするには、別途 `eas submit` が必要です。
+>
+> **ビルド → TestFlight の流れ:**
+> ```bash
+> # 1. ビルド作成
+> eas build --platform ios --profile production
+>
+> # 2. ビルド完了後、TestFlightにアップロード
+> eas submit --platform ios --latest
+> ```
+>
+> または、1コマンドで両方実行:
+> ```bash
+> eas build --platform ios --profile production --auto-submit
+> ```
+
 ### 開発ビルド（内部テスト用）
 
 ```bash

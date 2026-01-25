@@ -145,6 +145,40 @@ App Store Connect > 解決センター
 - 該当箇所のスクリーンショットを添付
 - 丁寧な説明を心がける
 
+## ビルド → TestFlight → 審査提出 フロー
+
+### Step 1: ビルド作成
+
+```bash
+eas build --platform ios --profile production
+```
+
+⚠️ **注意**: このコマンドだけではTestFlightにアップロードされない
+
+### Step 2: TestFlightにアップロード
+
+```bash
+eas submit --platform ios --latest
+```
+
+### Step 3: TestFlightで動作確認
+
+App Store Connect → TestFlight でビルドが表示されるまで待つ（数分〜数十分）
+
+### Step 4: 審査に提出
+
+App Store Connect → アプリ → 「審査へ提出」
+
+### ワンコマンドで実行（推奨）
+
+```bash
+eas build --platform ios --profile production --auto-submit
+```
+
+これでビルド完了後に自動でTestFlightにアップロードされる。
+
+---
+
 ## AI Assistant Instructions
 
 審査対策を行う時:
