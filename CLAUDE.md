@@ -95,6 +95,12 @@ EXPO_PUBLIC_FIREBASE_APP_ID
 | `.claude/skills/debugging-guide/`   | スキル   | デバッグ・トラブルシューティング |
 | `.claude/skills/support-developer/` | スキル   | 開発者応援・X問い合わせ機能      |
 | `.claude/skills/revenuecat-setup/`  | スキル   | RevenueCat + App Store Connect 課金設定 |
+| `.claude/skills/dev-flow/`          | スキル   | 開発フロー統合（タスク確認→実装→コミット→PR） |
+| `.claude/skills/feature-start/`     | スキル   | 新機能開始（ブランチ作成→タスク分割→ToDo） |
+| `.claude/skills/pr-ready/`          | スキル   | PR準備（型チェック→テスト→コミット→PR作成） |
+| `.claude/skills/hotfix/`            | スキル   | 緊急修正（hotfixブランチ→修正→即PR） |
+| `.claude/skills/release-check/`     | スキル   | リリース前チェック（ビルド→審査→変更履歴） |
+| `.claude/skills/code-review/`       | スキル   | コードレビュー（PR差分→分析→コメント） |
 
 > ルールの説明を踏まえ、必要と判断したルールは積極的に事前確認すること。
 >
