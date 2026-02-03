@@ -1,18 +1,22 @@
 ---
-name: release-check
-description: リリース前チェックスキル。ビルド確認、App Store審査チェック、変更履歴作成を一括実行。リリース準備、審査提出、ストア公開前に使用。
+name: release
+description: リリース統合スキル。ビルド確認、App Store審査チェック、変更履歴作成を一括実行。リリース準備、審査提出、ストア公開、リジェクト対策、App Store審査時に使用。
 ---
 
-# リリース前チェックスキル
+# リリース統合スキル
 
 App Store / Google Play へのリリース前に必要なチェックを一括で実行します。
+
+> **Note**: 旧 `/release-check` と `/appstore-review` スキルは本スキルに統合されました。`/release --review-only` で審査対策のみを実行できます。
 
 ## When to Use This Skill
 
 - アプリをリリースする前
-- 「/release-check」と入力された時
+- 「/release」と入力された時
 - 「リリース準備して」と依頼された時
 - App Store / Google Play に提出する前
+- 審査でリジェクトされた時（--review-only）
+- 審査ガイドラインを確認したい時（--review-only）
 
 ## ワークフロー
 
@@ -27,10 +31,10 @@ App Store / Google Play へのリリース前に必要なチェックを一括�
          ▼
 ┌──────────────────┐
 │ 3. ビルドテスト   │ EAS Build でビルド確認
-└────────┬─────────┘
+└────────┬─────────┘  ※ --skip-build でスキップ
          ▼
 ┌──────────────────┐
-│ 4. 審査チェック   │ App Store ガイドライン確認
+│ 4. 審査チェック   │ App Store ガイドライン確認（詳細）
 └────────┬─────────┘
          ▼
 ┌──────────────────┐
@@ -44,14 +48,6 @@ App Store / Google Play へのリリース前に必要なチェックを一括�
 
 ## 引数
 
-```
-/release-check                    # フルチェック
-/release-check --version 1.2.0    # バージョン指定
-/release-check --skip-build       # ビルドスキップ
-/release-check --ios-only         # iOSのみ
-/release-check --android-only     # Androidのみ
-```
-
 | 引数 | 説明 |
 |------|------|
 | `--version <x.y.z>` | リリースバージョンを指定 |
@@ -59,6 +55,26 @@ App Store / Google Play へのリリース前に必要なチェックを一括�
 | `--ios-only` | iOSのみチェック |
 | `--android-only` | Androidのみチェック |
 | `--quick` | 最小限のチェックのみ |
+| `--review-only` | 審査チェックのみ（旧 appstore-review 相当） |
+
+## 使用例
+
+```bash
+# フルチェック
+/release
+
+# バージョン指定
+/release --version 1.2.0
+
+# ビルドスキップ
+/release --skip-build
+
+# 審査チェックのみ（旧 /appstore-review 相当）
+/release --review-only
+
+# iOSのみ
+/release --ios-only
+```
 
 ## AI Assistant Instructions
 
@@ -110,7 +126,7 @@ npm run lint
 - [ ] console.log 残存なし
 - [ ] 開発用コード削除済み
 
-### フェーズ3: ビルドテスト
+### フェーズ3: ビルドテスト（--skip-build でスキップ）
 
 ```bash
 # iOS ビルド
@@ -128,23 +144,51 @@ eas build --platform android --profile preview
 
 ### フェーズ4: App Store 審査チェック
 
-`/appstore-review` スキルを参照して以下を確認:
+#### 提出前チェックリスト（必須項目）
 
-**必須チェック項目:**
+| 項目 | 確認内容 |
+|------|----------|
+| プライバシーポリシーURL | 設定済みか |
+| サポートURL | 設定済みか |
+| アプリアイコン | 1024x1024 |
+| スクリーンショット | 各デバイスサイズ |
+| アプリ説明文 | 記入済みか |
+| 年齢制限 | 設定済みか |
+| カテゴリ | 選択済みか |
 
-| カテゴリ | 確認事項 |
-|----------|----------|
-| **プライバシー** | プライバシーポリシーURL設定 |
-| **権限** | 使用する権限の説明文 |
-| **課金** | In-App Purchase の設定（該当時） |
-| **コンテンツ** | 不適切コンテンツなし |
-| **機能** | クラッシュ・バグなし |
-| **UI** | Apple HIG 準拠 |
+#### 技術要件
 
-```bash
-# app.json の権限説明確認
-cat app.json | grep -A20 'infoPlist'
-```
+- [ ] クラッシュしない
+- [ ] すべての機能が動作する
+- [ ] ログイン機能がある場合、テストアカウントを用意
+- [ ] 最新のiOSバージョンで動作確認
+- [ ] iPadでも正常に表示（Universal対応の場合）
+
+#### よくあるリジェクト理由と対策
+
+| Guideline | 原因 | 対策 |
+|-----------|------|------|
+| **2.1** アプリが完成していない | プレースホルダー、未実装機能 | すべての画面実装、TODO削除 |
+| **2.3** 正確なメタデータ | スクリーンショットが実際と異なる | 最新版スクリーンショット使用 |
+| **4.2** 最小限の機能 | 機能が少なすぎる | ネイティブ機能活用 |
+| **5.1.1** データ収集 | プライバシーポリシーがない | プライバシーポリシー設定 |
+| **3.1.1** アプリ内課金 | Apple以外の決済 | アプリ内課金を使用 |
+| **4.0** デザイン | UIが雑、使いにくい | HIG準拠 |
+
+#### ログイン機能がある場合（必須）
+
+1. **Apple でサインイン**を実装（サードパーティログインがある場合は必須）
+2. **テストアカウント**を審査時に提供
+3. **アカウント削除機能**を実装
+
+#### スクリーンショット要件
+
+| デバイス | サイズ |
+|----------|--------|
+| iPhone 6.7" | 1290 x 2796 |
+| iPhone 6.5" | 1284 x 2778 |
+| iPhone 5.5" | 1242 x 2208 |
+| iPad 12.9" | 2048 x 2732 |
 
 ### フェーズ5: 変更履歴作成
 
@@ -198,6 +242,39 @@ Improvements:
 
 Bug Fixes:
 • Fixed issue with AA
+```
+
+## リジェクト時の対応（--review-only）
+
+### 1. リジェクト理由を確認
+
+App Store Connect > 解決センター
+
+### 2. 対応方針
+
+| 状況 | 対応 |
+|------|------|
+| 明確な修正点がある | 修正して再提出 |
+| 理由に納得できない | 異議申し立て（Appeal） |
+| 不明点がある | 解決センターで質問 |
+
+### 3. 再提出時の注意
+
+- 修正内容を審査メモに記載
+- 該当箇所のスクリーンショットを添付
+- 丁寧な説明を心がける
+
+## ビルド → TestFlight → 審査提出 フロー
+
+```bash
+# Step 1: ビルド作成
+eas build --platform ios --profile production
+
+# Step 2: TestFlightにアップロード
+eas submit --platform ios --latest
+
+# ワンコマンドで実行（推奨）
+eas build --platform ios --profile production --auto-submit
 ```
 
 ## 完了時の出力
@@ -259,6 +336,9 @@ eas submit --platform all
 - [ ] 権限説明文設定
 - [ ] スクリーンショット最新化
 - [ ] アプリ説明文更新
+- [ ] Apple サインイン実装（該当時）
+- [ ] アカウント削除機能実装
+- [ ] テストアカウント用意
 
 ### ドキュメント
 - [ ] CHANGELOG 更新
@@ -266,8 +346,13 @@ eas submit --platform all
 - [ ] バージョン番号更新
 ```
 
+## 参考リンク
+
+- [App Store Review Guidelines](https://developer.apple.com/app-store/review/guidelines/)
+- [Human Interface Guidelines](https://developer.apple.com/design/human-interface-guidelines/)
+
 ## 関連スキル
 
-- `/appstore-review`: App Store 審査対策詳細
 - `/dev-flow`: 開発フロー
-- `/pr-ready`: PR作成
+- `/revenuecat-setup`: In-App Purchase 設定
+- `/hotfix`: 緊急修正フロー

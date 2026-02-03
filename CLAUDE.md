@@ -89,18 +89,16 @@ EXPO_PUBLIC_FIREBASE_APP_ID
 | `docs/coding-rules.md`            | コード   | コーディング規約                 |
 | `docs/uiux.md`                    | デザイン | UI/UX設計ルール                  |
 | `docs/TROUBLESHOOTING.md`         | 運用     | エラー対処法                     |
-| `.claude/skills/task-split/`        | スキル   | タスク分割                       |
+| `.claude/skills/dev-flow/`          | スキル   | 開発フロー統合（実装→コミット→PR）※旧pr-ready統合 |
+| `.claude/skills/feature-start/`     | スキル   | 新機能開始（ブランチ→タスク分割）※旧task-split統合 |
 | `.claude/skills/git-commit/`        | スキル   | コミットメッセージ生成           |
-| `.claude/skills/appstore-review/`   | スキル   | App Store審査対策                |
-| `.claude/skills/debugging-guide/`   | スキル   | デバッグ・トラブルシューティング |
-| `.claude/skills/support-developer/` | スキル   | 開発者応援・X問い合わせ機能      |
-| `.claude/skills/revenuecat-setup/`  | スキル   | RevenueCat + App Store Connect 課金設定 |
-| `.claude/skills/dev-flow/`          | スキル   | 開発フロー統合（タスク確認→実装→コミット→PR） |
-| `.claude/skills/feature-start/`     | スキル   | 新機能開始（ブランチ作成→タスク分割→ToDo） |
-| `.claude/skills/pr-ready/`          | スキル   | PR準備（型チェック→テスト→コミット→PR作成） |
 | `.claude/skills/hotfix/`            | スキル   | 緊急修正（hotfixブランチ→修正→即PR） |
-| `.claude/skills/release-check/`     | スキル   | リリース前チェック（ビルド→審査→変更履歴） |
+| `.claude/skills/release/`           | スキル   | リリース統合（ビルド→審査→変更履歴）※旧appstore-review統合 |
 | `.claude/skills/code-review/`       | スキル   | コードレビュー（PR差分→分析→コメント） |
+| `.claude/skills/revenuecat-setup/`  | スキル   | RevenueCat + App Store Connect 課金設定 |
+| `.claude/skills/debugging-guide/`   | スキル   | デバッグ・トラブルシューティング |
+| `.claude/skills/uiux-test/`         | スキル   | UI/UXテスト作成ガイド            |
+| `.claude/skills/skill-name/`        | スキル   | スキル作成ガイド                 |
 
 > ルールの説明を踏まえ、必要と判断したルールは積極的に事前確認すること。
 >
