@@ -43,9 +43,9 @@ Step 5: コードの修正（最後の手段）
 
 ```
 検索例:
-- react-native-screens expo sdk 54 "expected dynamic type 'boolean'"
-- expo "Module not found" react-navigation
-- react-native 0.81 hermes TypeError
+- next.js 15 "Module not found" error
+- tailwind css v4 "Cannot find module"
+- firebase auth "popup blocked" next.js
 ```
 
 **重要**: コードを修正する前に、必ずWeb検索を実行すること。
@@ -56,22 +56,22 @@ Step 5: コードの修正（最後の手段）
 
 | パッケージ | Issues URL |
 |-----------|-----------|
-| Expo | https://github.com/expo/expo/issues |
-| React Navigation | https://github.com/react-navigation/react-navigation/issues |
-| React Native Screens | https://github.com/software-mansion/react-native-screens/issues |
-| React Native | https://github.com/facebook/react-native/issues |
+| Next.js | https://github.com/vercel/next.js/issues |
+| React | https://github.com/facebook/react/issues |
+| Tailwind CSS | https://github.com/tailwindlabs/tailwindcss/issues |
+| shadcn/ui | https://github.com/shadcn-ui/ui/issues |
 
 ### Step 3: 依存関係の互換性チェック
 
 ```bash
-# Expo プロジェクトの場合
-npx expo-doctor
-
-# 特定パッケージのバージョン確認
+# バージョン確認
 npm ls <package-name>
 
-# 互換性のあるバージョンをインストール
-npx expo install <package-name>
+# 古いパッケージの確認
+npm outdated
+
+# 互換性の確認
+npm audit
 ```
 
 ### Step 4: 最小構成でのテスト
@@ -80,19 +80,13 @@ npx expo install <package-name>
 
 1. **最小限のコードで再現確認**
    ```tsx
-   // 最小構成の例
-   export default function App() {
-     return (
-       <View>
-         <Text>Test</Text>
-       </View>
-     );
+   export default function TestPage() {
+     return <div>Test</div>;
    }
    ```
 
 2. **段階的にコンポーネントを追加**
-   - ナビゲーション追加 → エラー発生？
-   - 特定の画面追加 → エラー発生？
+   - レイアウト追加 → エラー発生？
    - 特定のコンポーネント追加 → エラー発生？
 
 3. **原因コンポーネントを特定**
@@ -105,54 +99,60 @@ npx expo install <package-name>
 
 | エラータイプ | よくある原因 | 対処法 |
 |-------------|-------------|--------|
-| TypeError: expected dynamic type | パッケージバージョンの互換性問題 | パッケージのダウングレード |
-| Module not found | 依存関係の不足、パス間違い | `npm install` または パス確認 |
-| Native module error | New Architecture互換性 | 開発ビルドで確認 |
-| Invariant Violation | コンポーネントの誤使用 | 公式ドキュメント確認 |
+| Hydration Error | サーバーとクライアントのレンダリング不一致 | useEffect で動的値を設定、suppressHydrationWarning |
+| Module not found | 依存関係の不足、パス間違い | `npm install` またはパス確認 |
+| "window is not defined" | Server Component でブラウザAPIを使用 | "use client" を追加 |
+| TypeError: Cannot read properties of null | 非同期データの未ロード | オプショナルチェーン（?.）を使用 |
+| Build error | 型エラー、import エラー | `npx tsc --noEmit` で確認 |
 
-## Expo/React Native特有の注意点
+## Next.js 特有の注意点
 
-### 1. Expo Goでは常にNew Architectureが有効
+### 1. Server Components vs Client Components
 
-- `newArchEnabled: false` はExpo Goでは**無視される**
-- New Architectureを無効にするには**開発ビルド**が必要
+- `"use client"` を忘れるとブラウザAPIが使えない
+- Server Components では useState, useEffect が使えない
+- クライアント専用のライブラリは dynamic import + `ssr: false` で対応
 
-### 2. パッケージバージョンの互換性
+### 2. 環境変数
 
-- Expo SDKバージョンに合わせたパッケージを使用
-- `npx expo install <package>` で互換バージョンをインストール
-- 手動で `npm install` する場合はバージョンに注意
+- クライアント側で使う環境変数には `NEXT_PUBLIC_` プレフィックスが必要
+- `.env.local` はGitにコミットしない
 
 ### 3. キャッシュクリア
 
 問題発生時はキャッシュクリアを試す：
 
 ```bash
-# Expo
-npx expo start --clear
-
-# Metro
-npx react-native start --reset-cache
+# Next.js キャッシュ
+rm -rf .next
 
 # npm
 rm -rf node_modules && npm install
 ```
 
-## 実例: react-native-screens 4.17.x問題
+## 実例: Hydration Error
 
 ### 症状
 ```
-TypeError: expected dynamic type 'boolean', but had type 'string'
+Hydration failed because the initial UI does not match what was rendered on the server.
 ```
 
 ### 原因
-react-native-screens 4.17.x以降とExpo SDK 54の互換性問題
+日付表示やランダム値など、サーバーとクライアントで異なる値をレンダリング
 
 ### 解決策
-```bash
-npm install react-native-screens@4.16.0
-npx expo start --clear
-```
+```typescript
+"use client";
 
-### 参考
-- https://github.com/software-mansion/react-native-screens/issues/3470
+import { useEffect, useState } from "react";
+
+export function CurrentDate() {
+  const [date, setDate] = useState<string>("");
+
+  useEffect(() => {
+    setDate(new Date().toLocaleDateString("ja-JP"));
+  }, []);
+
+  return <span>{date}</span>;
+}
+```

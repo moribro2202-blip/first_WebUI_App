@@ -3,12 +3,9 @@
 ## 前提条件
 
 - Windows 11
-- Node.js 18.x 以上
+- Node.js 20.x 以上
 - npm または yarn
 - Git
-- Android Studio + JDK 17
-
-> **Note**: iOS ビルドは EAS Build（クラウド）を使用
 
 ## 初回セットアップ
 
@@ -27,62 +24,60 @@ npm install
 
 ### 3. 環境変数の設定
 
-`.env.example` をコピーして `.env` を作成:
+`.env.example` をコピーして `.env.local` を作成:
 
-```powershell
-copy .env.example .env
+```bash
+cp .env.example .env.local
 ```
 
 Firebase の設定値を入力:
 
 ```
-EXPO_PUBLIC_FIREBASE_API_KEY=
-EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=
-EXPO_PUBLIC_FIREBASE_PROJECT_ID=
-EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=
-EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
-EXPO_PUBLIC_FIREBASE_APP_ID=
+NEXT_PUBLIC_FIREBASE_API_KEY=
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
+NEXT_PUBLIC_FIREBASE_APP_ID=
 ```
 
 ### 4. 開発サーバーの起動
 
 ```bash
-npx expo start
+npm run dev
 ```
 
-## 実機・エミュレータでの確認
-
-### Expo Go（推奨）
-
-1. スマホに Expo Go アプリをインストール
-2. QR コードをスキャン
-
-### Android エミュレータ
-
-```bash
-npx expo start --android
-```
+ブラウザで http://localhost:3000 を開く。
 
 ## よく使うコマンド
 
 | コマンド | 説明 |
 |----------|------|
-| `npx expo start` | 開発サーバー起動 |
-| `npx expo start --clear` | キャッシュクリアして起動 |
-| `npx expo start --android` | Android エミュレータで起動 |
+| `npm run dev` | 開発サーバー起動 |
+| `npm run build` | プロダクションビルド |
+| `npm run start` | ビルド後のサーバー起動 |
 | `npm run lint` | ESLint 実行 |
 | `npm run test` | テスト実行 |
 | `npx tsc --noEmit` | 型チェック |
-| `npx expo doctor` | プロジェクト健全性チェック |
+
+## shadcn/ui コンポーネント追加
+
+```bash
+# コンポーネントを追加
+npx shadcn@latest add button
+npx shadcn@latest add card
+npx shadcn@latest add input
+npx shadcn@latest add dialog
+```
 
 ## キャッシュクリア
 
-```powershell
-# Expo キャッシュクリア
-npx expo start --clear
+```bash
+# Next.js キャッシュクリア
+rm -rf .next
 
 # node_modules 再インストール
-Remove-Item -Recurse -Force node_modules
+rm -rf node_modules
 npm install
 ```
 

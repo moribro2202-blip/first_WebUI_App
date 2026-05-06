@@ -1,229 +1,158 @@
 
 
-# UI/UX 設計・実装ルール（React Native/Expo）
+# UI/UX 設計・実装ルール（Next.js Web App）
 
 ## 1. デザインシステム
 
 ### 重要度: 最高
 
-- NativeWind（Tailwind CSS for RN）をベースとしたスタイリング
+- Tailwind CSS をベースとしたスタイリング
+- shadcn/ui コンポーネントを活用
 
 -**既存の UI は承認なしでの変更を禁止**
 
 - コンポーネントのカスタマイズは最小限に抑える
 
 ```typescript
+// 良い例：Tailwind CSS を使用
+<div className="flex flex-1 items-center justify-center p-4">
+  <p className="text-lg font-bold">Hello</p>
+</div>
 
-// ✅ 良い例：NativeWindを使用
-
-import { View, Text } from"react-native";
-
-
-<View className="flex-1 items-center justify-center p-4">
-
-  <Text className="text-lg font-bold">Hello</Text>
-
-</View>
-
-
-// ❌ 悪い例：インラインスタイル
-
-<View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-
-  <Text style={{ fontSize: 18, fontWeight: 'bold' }}>Hello</Text>
-
-</View>
-
+// 悪い例：インラインスタイル
+<div style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+  <p style={{ fontSize: 18, fontWeight: 'bold' }}>Hello</p>
+</div>
 ```
 
 ## 2. スタイリング規約
 
 ### 重要度: 高
 
-### NativeWind の使用
+### Tailwind CSS の使用
 
 - ユーティリティクラスを優先的に使用
-- StyleSheet は特殊なケースのみ使用
-- 命名規則は `kebab-case`を使用
+- CSS Modules は特殊なケースのみ使用
+- className の結合には `cn()` ユーティリティを使用
 
 ```typescript
+// 良い例：Tailwind CSS
+<div className="flex flex-row items-center gap-2 rounded-lg bg-white p-4">
+  <p className="text-base text-gray-800">タイトル</p>
+</div>
 
-// ✅ 良い例：NativeWind
+// cn() ユーティリティの使用
+import { cn } from "@/lib/utils";
 
-<View className="flex-row items-center gap-2 p-4 bg-white rounded-lg">
-
-  <Text className="text-base text-gray-800">タイトル</Text>
-
-</View>
-
-
-// ⚠️ 許容：動的スタイルが必要な場合のみStyleSheet
-
-import { StyleSheet } from"react-native";
-
-
-const styles = StyleSheet.create({
-
-  dynamicHeight: {
-
-    height: calculatedHeight,
-
-  },
-
-});
-
+<div className={cn("rounded-lg p-4", isActive && "bg-primary text-white")}>
 ```
 
 ### 色の定義
 
-```typescript
+```css
+/* globals.css で CSS Variables を使用 */
+:root {
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+  --primary: 222.2 47.4% 11.2%;
+  --secondary: 210 40% 96.1%;
+  --destructive: 0 84.2% 60.2%;
+  --muted: 210 40% 96.1%;
+  --accent: 210 40% 96.1%;
+}
 
-// tailwind.config.js で色を定義
-
-module.exports= {
-
-  theme: {
-
-    extend: {
-
-      colors: {
-
-        primary: "#007AFF",
-
-        secondary: "#5856D6",
-
-        success: "#34C759",
-
-        warning: "#FF9500",
-
-        error: "#FF3B30",
-
-      },
-
-    },
-
-  },
-
-};
-
+.dark {
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
+  /* ... */
+}
 ```
 
-## 3. プラットフォーム対応
+## 3. レスポンシブデザイン
 
 ### 重要度: 高
 
-- iOS / Android 両方で一貫した体験を提供
-- プラットフォーム固有の調整は最小限に
+- モバイルファーストでデザイン
+- Tailwind のブレークポイントを使用
 
 ```typescript
+// 良い例：レスポンシブ対応
+<div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+  {items.map((item) => (
+    <Card key={item.id}>{item.title}</Card>
+  ))}
+</div>
 
-import { Platform } from"react-native";
-
-
-// ✅ 良い例：NativeWindのプラットフォーム対応
-
-<View className="ios:pt-12 android:pt-4">
-
-
-// プラットフォーム固有の処理が必要な場合
-
-{Platform.OS ==="ios"? (
-
-  <IOSComponent />
-
-) : (
-
-  <AndroidComponent />
-
-)}
-
+// テキストサイズのレスポンシブ
+<h1 className="text-2xl font-bold md:text-3xl lg:text-4xl">
+  タイトル
+</h1>
 ```
+
+### ブレークポイント
+
+| プレフィックス | 最小幅 | 用途 |
+|---------------|--------|------|
+| `sm:` | 640px | 小型タブレット |
+| `md:` | 768px | タブレット |
+| `lg:` | 1024px | デスクトップ |
+| `xl:` | 1280px | 大型デスクトップ |
+| `2xl:` | 1536px | 超大型画面 |
 
 ## 4. アクセシビリティ
 
 ### 重要度: 高
 
-- accessibilityLabel を適切に設定
-- accessibilityRole を正しく指定
-- accessibilityHint でヒントを提供
+- セマンティックHTMLを使用
+- ARIA属性を適切に設定
+- キーボードナビゲーション対応
 
 ```typescript
-
-// ✅ 良い例
-
-<TouchableOpacity
-
-  accessibilityLabel="プロフィールを編集"
-
-  accessibilityRole="button"
-
-  accessibilityHint="プロフィール編集画面に移動します"
-
-  onPress={handleEdit}
-
+// 良い例
+<button
+  aria-label="プロフィールを編集"
+  onClick={handleEdit}
 >
-
-  <Text>編集</Text>
-
-</TouchableOpacity>
-
+  <Pencil className="h-4 w-4" />
+  <span>編集</span>
+</button>
 
 // 画像のアクセシビリティ
-
 <Image
-
-  source={{ uri: imageUrl }}
-
-  accessibilityLabel="ユーザーのプロフィール画像"
-
+  src={imageUrl}
+  alt="ユーザーのプロフィール画像"
+  width={100}
+  height={100}
 />
 
+// フォームのラベル
+<Label htmlFor="email">メールアドレス</Label>
+<Input id="email" type="email" />
 ```
 
 ## 5. アニメーションとトランジション
 
 ### 重要度: 中
 
-- React Native Reanimated を使用
+- Tailwind の transition ユーティリティまたは Framer Motion を使用
 - 過度なアニメーションを避ける
-- 60fps を維持できるアニメーションのみ実装
 
 ```typescript
+// Tailwind transition
+<button className="transition-colors hover:bg-primary/90">
+  ボタン
+</button>
 
-import Animated, {
+// Framer Motion
+import { motion } from "framer-motion";
 
-  useSharedValue,
-
-  useAnimatedStyle,
-
-  withSpring,
-
-} from"react-native-reanimated";
-
-
-// ✅ 良い例
-
-const opacity =useSharedValue(0);
-
-
-const animatedStyle =useAnimatedStyle(() => ({
-
-  opacity: opacity.value,
-
-}));
-
-
-// アニメーション実行
-
-opacity.value =withSpring(1);
-
-
-<Animated.View style={animatedStyle}>
-
-  <Text>コンテンツ</Text>
-
-</Animated.View>
-
+<motion.div
+  initial={{ opacity: 0, y: 20 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ duration: 0.3 }}
+>
+  コンテンツ
+</motion.div>
 ```
 
 ## 6. フォーム設計
@@ -232,31 +161,54 @@ opacity.value =withSpring(1);
 
 - React Hook Form + Zod でバリデーション
 - エラーメッセージは明確に表示
-- キーボード対応を適切に実装
+- shadcn/ui の Form コンポーネントを活用
 
 ```typescript
+"use client";
 
-import { KeyboardAvoidingView, Platform, ScrollView } from"react-native";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
+const schema = z.object({
+  email: z.string().email("有効なメールアドレスを入力してください"),
+  password: z.string().min(8, "パスワードは8文字以上です"),
+});
 
-// ✅ 良い例：キーボード対応
+export function LoginForm() {
+  const form = useForm({
+    resolver: zodResolver(schema),
+    defaultValues: { email: "", password: "" },
+  });
 
-<KeyboardAvoidingView
+  const onSubmit = (data: z.infer<typeof schema>) => {
+    // 送信処理
+  };
 
-  behavior={Platform.OS ==="ios"?"padding":"height"}
-
-  className="flex-1"
-
->
-
-  <ScrollView keyboardShouldPersistTaps="handled">
-
-    {/* フォーム内容 */}
-
-  </ScrollView>
-
-</KeyboardAvoidingView>
-
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <FormField
+          control={form.control}
+          name="email"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>メールアドレス</FormLabel>
+              <FormControl>
+                <Input placeholder="mail@example.com" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <Button type="submit">ログイン</Button>
+      </form>
+    </Form>
+  );
+}
 ```
 
 ## 7. 重要な制約事項
@@ -283,87 +235,38 @@ import { KeyboardAvoidingView, Platform, ScrollView } from"react-native";
 ### ローディング状態
 
 ```typescript
+// Next.js loading.tsx
+import { Skeleton } from "@/components/ui/skeleton";
 
-import { View, ActivityIndicator } from"react-native";
+export default function Loading() {
+  return (
+    <div className="space-y-4 p-6">
+      <Skeleton className="h-8 w-64" />
+      <Skeleton className="h-48 w-full" />
+    </div>
+  );
+}
 
-
-// ✅ 良い例
-
+// コンポーネント内
 {isLoading ? (
-
-  <View className="flex-1 items-center justify-center">
-
-    <ActivityIndicator size="large" color="#007AFF"/>
-
-  </View>
-
+  <div className="flex flex-1 items-center justify-center">
+    <Loader2 className="h-6 w-6 animate-spin" />
+  </div>
 ) : (
-
   <Content />
-
 )}
-
-```
-
-### 触覚フィードバック
-
-```typescript
-
-import*as Haptics from"expo-haptics";
-
-
-// ボタン押下時
-
-consthandlePress=async () => {
-
-  await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-  // 処理
-
-};
-
-
-// 成功時
-
-await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
-
-// エラー時
-
-await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-
 ```
 
 ### トースト通知
 
 ```typescript
-
-import Toast from"react-native-toast-message";
-
+import { toast } from "sonner";
 
 // 成功
-
-Toast.show({
-
-  type: "success",
-
-  text1: "保存しました",
-
-});
-
+toast.success("保存しました");
 
 // エラー
-
-Toast.show({
-
-  type: "error",
-
-  text1: "エラー",
-
-  text2: "保存に失敗しました",
-
-});
-
+toast.error("保存に失敗しました");
 ```
 
 ## 9. アイコンと画像
@@ -373,39 +276,25 @@ Toast.show({
 ### アイコン
 
 ```typescript
+// 良い例：lucide-react
+import { Home, User, Settings } from "lucide-react";
 
-// ✅ 良い例：lucide-react-native
-
-import { Home, User, Settings } from"lucide-react-native";
-
-
-<Home size={24} color="#007AFF"/>
-
+<Home className="h-5 w-5 text-primary" />
 ```
 
 ### 画像最適化
 
 ```typescript
-
-// ✅ 良い例：expo-image
-
-import { Image } from"expo-image";
-
+// 良い例：next/image
+import Image from "next/image";
 
 <Image
-
-  source={{ uri: imageUrl }}
-
-  style={{ width: 100, height: 100 }}
-
-  contentFit="cover"
-
-  placeholder={blurhash}
-
-  transition={200}
-
+  src={imageUrl}
+  alt="説明"
+  width={100}
+  height={100}
+  className="rounded-lg object-cover"
 />
-
 ```
 
 ## 10. ダークモード対応
@@ -413,29 +302,15 @@ import { Image } from"expo-image";
 ### 重要度: 高
 
 ```typescript
+// Tailwind CSS のダークモード
+<div className="bg-white dark:bg-gray-900">
+  <p className="text-gray-900 dark:text-white">テキスト</p>
+</div>
 
-import { useColorScheme, View, Text } from"react-native";
+// next-themes を使用
+import { useTheme } from "next-themes";
 
-
-// NativeWindでのダークモード
-
-<View className="bg-white dark:bg-gray-900">
-
-  <Text className="text-gray-900 dark:text-white">
-
-    テキスト
-
-  </Text>
-
-</View>
-
-
-// プログラマティックに取得
-
-const colorScheme =useColorScheme();
-
-const isDark = colorScheme ==="dark";
-
+const { theme, setTheme } = useTheme();
 ```
 
 ## 11. コンポーネント設計原則
@@ -447,157 +322,58 @@ const isDark = colorScheme ==="dark";
 - 適切なコンポーネント分割
 
 ```typescript
-
-// ✅ 良い例
-
-interfaceCardProps {
-
-  title:string;
-
-  children:React.ReactNode;
-
-  className?:string;
-
-  onPress?: () =>void;
-
+// 良い例
+interface CardProps {
+  title: string;
+  children: React.ReactNode;
+  className?: string;
+  onClick?: () => void;
 }
 
-
-exportfunctionCard({ title, children, className, onPress }:CardProps) {
-
+export function Card({ title, children, className, onClick }: CardProps) {
   return (
-
-    <TouchableOpacity
-
-      onPress={onPress}
-
-      disabled={!onPress}
-
-      className={cn("bg-white rounded-lg p-4 shadow-sm", className)}
-
+    <div
+      onClick={onClick}
+      className={cn("rounded-lg bg-white p-4 shadow-sm", className)}
     >
-
-      <Text className="text-lg font-bold mb-2">{title}</Text>
-
+      <h3 className="mb-2 text-lg font-bold">{title}</h3>
       {children}
-
-    </TouchableOpacity>
-
+    </div>
   );
-
 }
 
-
-// ❌ 悪い例
-
-interfaceCardProps {
-
-  title:string;
-
-  titleColor:string; // 不要なカスタマイズ
-
-  customPadding:number; // 避けるべき
-
+// 悪い例
+interface CardProps {
+  title: string;
+  titleColor: string; // 不要なカスタマイズ
+  customPadding: number; // 避けるべき
 }
-
-```
-
-## 12. セーフエリア対応
-
-### 重要度: 高
-
-```typescript
-
-import { SafeAreaView } from"react-native-safe-area-context";
-
-
-// ✅ 良い例
-
-<SafeAreaView className="flex-1 bg-white">
-
-  <Content />
-
-</SafeAreaView>
-
-
-// 特定のエッジのみ
-
-<SafeAreaView edges={["top"]} className="flex-1">
-
-  <Content />
-
-</SafeAreaView>
-
-```
-
-## 13. スクロールとリスト
-
-### 重要度: 高
-
-```typescript
-
-// 通常のスクロール
-
-import { ScrollView } from"react-native";
-
-
-<ScrollView
-
-  className="flex-1"
-
-  showsVerticalScrollIndicator={false}
-
-  contentContainerStyle={{ paddingBottom: 20 }}
-
->
-
-  {/* コンテンツ */}
-
-</ScrollView>
-
-
-// 大量データ
-
-import { FlashList } from"@shopify/flash-list";
-
-
-<FlashList
-
-  data={items}
-
-  renderItem={({ item }) => <ItemCard item={item} />}
-
-  estimatedItemSize={80}
-
-/>
-
 ```
 
 ## 注意事項
 
 1. デザインの一貫性
 
-- NativeWind クラスの一貫した使用
+- Tailwind CSS クラスの一貫した使用
 - カスタムスタイルの最小化
-- デザイントークンの遵守
+- デザイントークン（CSS Variables）の遵守
 
 2. パフォーマンス
 
 - 不要な再レンダリングの防止（memo, useMemo, useCallback）
-- 画像の最適化（expo-image）
-- リストの最適化（FlashList）
+- 画像の最適化（next/image）
+- Server Components の活用
 
 3. テスト
 
-- コンポーネントのスナップショットテスト
-- 複数デバイスでの表示確認
-- iOS / Android 両方でテスト
+- コンポーネントの Testing Library テスト
+- 複数ブラウザでの表示確認
+- レスポンシブ表示の確認
 
 4. ドキュメント
 
 - コンポーネントの使用例
 - Props の型定義
-- デザインシステムのガイドライン
 
 これらのルールは、プロジェクトの一貫性と保守性を確保するために重要です。
 

@@ -1,11 +1,11 @@
 ---
 name: uiux-test
-description: React Native/ExpoのUI/UXテスト作成ガイド。コンポーネントテスト、スナップショットテスト、アクセシビリティテスト、インタラクションテストのベストプラクティスを提供。UIテスト、コンポーネントテスト作成時に使用。
+description: Next.js/ReactのUI/UXテスト作成ガイド。コンポーネントテスト、スナップショットテスト、アクセシビリティテスト、インタラクションテストのベストプラクティスを提供。UIテスト、コンポーネントテスト作成時に使用。
 ---
 
 # UI/UX テスト ベストプラクティス
 
-React Native/Expo プロジェクトにおけるUI/UXテストのガイド。
+Next.js / React プロジェクトにおけるUI/UXテストのガイド。
 
 ## When to Use This Skill
 
@@ -20,47 +20,44 @@ React Native/Expo プロジェクトにおけるUI/UXテストのガイド。
 src/
 ├── components/
 │   ├── ui/
-│   │   ├── Button.tsx
+│   │   ├── button.tsx
 │   │   └── __tests__/
-│   │       └── Button.test.tsx
+│   │       └── button.test.tsx
 │   └── features/
 │       ├── auth/
-│       │   ├── LoginForm.tsx
+│       │   ├── login-form.tsx
 │       │   └── __tests__/
-│       │       └── LoginForm.test.tsx
+│       │       └── login-form.test.tsx
 ```
 
 ## 基本構造
 
 ```typescript
-import { render, screen, fireEvent } from "@testing-library/react-native";
-import { Button } from "../Button";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { Button } from "../button";
 
 describe("Button", () => {
   // レンダリングテスト
   it("renders correctly with label", () => {
-    render(<Button label="送信" onPress={() => {}} />);
-    expect(screen.getByText("送信")).toBeTruthy();
+    render(<Button>送信</Button>);
+    expect(screen.getByText("送信")).toBeInTheDocument();
   });
 
   // インタラクションテスト
-  it("calls onPress when pressed", () => {
-    const onPressMock = jest.fn();
-    render(<Button label="送信" onPress={onPressMock} />);
+  it("calls onClick when clicked", () => {
+    const onClickMock = vi.fn();
+    render(<Button onClick={onClickMock}>送信</Button>);
 
-    fireEvent.press(screen.getByText("送信"));
+    fireEvent.click(screen.getByText("送信"));
 
-    expect(onPressMock).toHaveBeenCalledTimes(1);
+    expect(onClickMock).toHaveBeenCalledTimes(1);
   });
 
   // 状態テスト
   it("is disabled when disabled prop is true", () => {
-    const onPressMock = jest.fn();
-    render(<Button label="送信" onPress={onPressMock} disabled />);
+    render(<Button disabled>送信</Button>);
 
-    fireEvent.press(screen.getByText("送信"));
-
-    expect(onPressMock).not.toHaveBeenCalled();
+    expect(screen.getByText("送信")).toBeDisabled();
   });
 });
 ```
@@ -69,58 +66,24 @@ describe("Button", () => {
 
 ```typescript
 describe("Button accessibility", () => {
-  it("has correct accessibility label", () => {
+  it("has correct aria-label", () => {
     render(
-      <Button
-        label="送信"
-        onPress={() => {}}
-        accessibilityLabel="フォームを送信"
-      />
+      <Button aria-label="フォームを送信">送信</Button>
     );
 
-    expect(screen.getByLabelText("フォームを送信")).toBeTruthy();
+    expect(screen.getByLabelText("フォームを送信")).toBeInTheDocument();
   });
 
-  it("has correct accessibility role", () => {
-    render(<Button label="送信" onPress={() => {}} />);
+  it("has correct role", () => {
+    render(<Button>送信</Button>);
 
-    expect(screen.getByRole("button")).toBeTruthy();
+    expect(screen.getByRole("button")).toBeInTheDocument();
   });
 
   it("announces disabled state", () => {
-    render(<Button label="送信" onPress={() => {}} disabled />);
+    render(<Button disabled>送信</Button>);
 
-    const button = screen.getByRole("button");
-    expect(button.props.accessibilityState.disabled).toBe(true);
-  });
-});
-```
-
-## スナップショットテスト
-
-```typescript
-import { render } from "@testing-library/react-native";
-import { Card } from "../Card";
-
-describe("Card snapshots", () => {
-  it("matches snapshot with default props", () => {
-    const { toJSON } = render(
-      <Card title="タイトル">
-        <Text>コンテンツ</Text>
-      </Card>
-    );
-
-    expect(toJSON()).toMatchSnapshot();
-  });
-
-  it("matches snapshot with custom className", () => {
-    const { toJSON } = render(
-      <Card title="タイトル" className="bg-blue-500">
-        <Text>コンテンツ</Text>
-      </Card>
-    );
-
-    expect(toJSON()).toMatchSnapshot();
+    expect(screen.getByRole("button")).toBeDisabled();
   });
 });
 ```
@@ -128,47 +91,34 @@ describe("Card snapshots", () => {
 ## フォームテスト
 
 ```typescript
-import { render, screen, fireEvent, waitFor } from "@testing-library/react-native";
-import { LoginForm } from "../LoginForm";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { LoginForm } from "../login-form";
 
 describe("LoginForm", () => {
   it("shows validation error for empty email", async () => {
     render(<LoginForm onSubmit={() => {}} />);
 
-    fireEvent.press(screen.getByText("ログイン"));
+    await userEvent.click(screen.getByText("ログイン"));
 
     await waitFor(() => {
-      expect(screen.getByText("メールアドレスを入力してください")).toBeTruthy();
-    });
-  });
-
-  it("shows validation error for invalid email", async () => {
-    render(<LoginForm onSubmit={() => {}} />);
-
-    fireEvent.changeText(
-      screen.getByPlaceholderText("メールアドレス"),
-      "invalid-email"
-    );
-    fireEvent.press(screen.getByText("ログイン"));
-
-    await waitFor(() => {
-      expect(screen.getByText("有効なメールアドレスを入力してください")).toBeTruthy();
+      expect(screen.getByText("メールアドレスを入力してください")).toBeInTheDocument();
     });
   });
 
   it("submits form with valid data", async () => {
-    const onSubmitMock = jest.fn();
+    const onSubmitMock = vi.fn();
     render(<LoginForm onSubmit={onSubmitMock} />);
 
-    fireEvent.changeText(
-      screen.getByPlaceholderText("メールアドレス"),
+    await userEvent.type(
+      screen.getByLabelText("メールアドレス"),
       "test@example.com"
     );
-    fireEvent.changeText(
-      screen.getByPlaceholderText("パスワード"),
+    await userEvent.type(
+      screen.getByLabelText("パスワード"),
       "password123"
     );
-    fireEvent.press(screen.getByText("ログイン"));
+    await userEvent.click(screen.getByText("ログイン"));
 
     await waitFor(() => {
       expect(onSubmitMock).toHaveBeenCalledWith({
@@ -185,83 +135,44 @@ describe("LoginForm", () => {
 ```typescript
 describe("Button loading state", () => {
   it("shows loading indicator when loading", () => {
-    render(<Button label="送信" onPress={() => {}} isLoading />);
+    render(<Button isLoading>送信</Button>);
 
-    expect(screen.getByTestId("loading-indicator")).toBeTruthy();
-    expect(screen.queryByText("送信")).toBeNull();
+    expect(screen.getByTestId("loading-spinner")).toBeInTheDocument();
   });
 
   it("disables interaction when loading", () => {
-    const onPressMock = jest.fn();
-    render(<Button label="送信" onPress={onPressMock} isLoading />);
+    const onClickMock = vi.fn();
+    render(<Button isLoading onClick={onClickMock}>送信</Button>);
 
-    fireEvent.press(screen.getByTestId("loading-indicator"));
+    fireEvent.click(screen.getByRole("button"));
 
-    expect(onPressMock).not.toHaveBeenCalled();
-  });
-});
-```
-
-## リストテスト（FlashList）
-
-```typescript
-import { render, screen } from "@testing-library/react-native";
-import { ItemList } from "../ItemList";
-
-const mockItems = [
-  { id: "1", title: "アイテム1" },
-  { id: "2", title: "アイテム2" },
-  { id: "3", title: "アイテム3" },
-];
-
-describe("ItemList", () => {
-  it("renders all items", () => {
-    render(<ItemList items={mockItems} />);
-
-    expect(screen.getByText("アイテム1")).toBeTruthy();
-    expect(screen.getByText("アイテム2")).toBeTruthy();
-    expect(screen.getByText("アイテム3")).toBeTruthy();
-  });
-
-  it("renders empty state when no items", () => {
-    render(<ItemList items={[]} />);
-
-    expect(screen.getByText("アイテムがありません")).toBeTruthy();
+    expect(onClickMock).not.toHaveBeenCalled();
   });
 });
 ```
 
 ## モック設定
 
-### ナビゲーションモック
+### Next.js ナビゲーションモック
 
 ```typescript
-// jest.setup.js
-jest.mock("expo-router", () => ({
-  router: {
-    push: jest.fn(),
-    replace: jest.fn(),
-    back: jest.fn(),
-  },
-  useLocalSearchParams: () => ({}),
-  Link: ({ children }) => children,
+// vitest.setup.ts
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    back: vi.fn(),
+  }),
+  usePathname: () => "/",
+  useSearchParams: () => new URLSearchParams(),
 }));
 ```
 
-### 画像モック
+### next/image モック
 
 ```typescript
-jest.mock("expo-image", () => ({
-  Image: "Image",
-}));
-```
-
-### Haptics モック
-
-```typescript
-jest.mock("expo-haptics", () => ({
-  impactAsync: jest.fn(),
-  notificationAsync: jest.fn(),
+vi.mock("next/image", () => ({
+  default: (props: any) => <img {...props} />,
 }));
 ```
 
@@ -271,20 +182,20 @@ jest.mock("expo-haptics", () => ({
 
 1. **必ず実際の機能を検証する** - `expect(true).toBe(true)` は禁止
 2. **ユーザー視点でテストを書く** - 実装詳細ではなく振る舞いをテスト
-3. **アクセシビリティを検証** - accessibilityLabel, accessibilityRole を確認
+3. **アクセシビリティを検証** - aria-label, role を確認
 4. **境界値・異常系をテスト** - 空データ、無効な入力、エラー状態
 5. **テストIDよりテキスト/ロールを優先** - `getByText`, `getByRole` を使用
 
 ### テスト命名規則
 
 ```typescript
-// ✅ Good: 振る舞いを説明
+// Good: 振る舞いを説明
 it("shows error message when email is invalid", () => {});
-it("navigates to profile screen when avatar is pressed", () => {});
+it("navigates to profile page when avatar is clicked", () => {});
 
-// ❌ Bad: 実装詳細
+// Bad: 実装詳細
 it("sets isError to true", () => {});
-it("calls handlePress function", () => {});
+it("calls handleClick function", () => {});
 ```
 
 ### カバレッジ目標

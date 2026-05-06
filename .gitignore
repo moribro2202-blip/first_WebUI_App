@@ -1,21 +1,13 @@
 # Dependencies
 node_modules/
 
-# Expo
-.expo/
+# Next.js
+.next/
+out/
+
+# Build
 dist/
-web-build/
-
-# Native builds
-*.orig.*
-*.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
-
-# Metro
-.metro-health-check*
+build/
 
 # Environment variables
 .env
@@ -31,6 +23,15 @@ web-build/
 # OS
 .DS_Store
 Thumbs.db
+
+# Testing
+coverage/
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
 
 # Claude Code MCP settings (contains tokens)
 .claude/settings.json

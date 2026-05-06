@@ -4,14 +4,14 @@
 
 ## プロジェクト概要
 
-React Native/Expo モバイルアプリケーションプロジェクト（iOS/Android）
+Next.js (App Router) Web アプリケーションプロジェクト
 
 ## 重要ルール
 
 - **既存UIの変更は事前承認が必須**
 - **技術スタックのバージョン変更禁止**
 - **要件に記載のない機能追加は禁止**
-- **アイコンは Lucide（lucide-react-native）のみ使用**
+- **アイコンは Lucide（lucide-react）のみ使用**
 
 詳細は各ドキュメントを参照。
 
@@ -33,7 +33,7 @@ React Native/Expo モバイルアプリケーションプロジェクト（iOS/A
 | UIを作成する           | `docs/uiux.md`                    |
 | ルーティングを追加する | `docs/router.md`                  |
 | Firebaseを使う         | `docs/firebase.md`                |
-| ビルド・リリースする   | `docs/BUILD_RELEASE.md`           |
+| ビルド・デプロイする   | `docs/BUILD_RELEASE.md`           |
 | エラーで困った         | `docs/TROUBLESHOOTING.md`         |
 
 ### ドキュメント一覧
@@ -41,7 +41,7 @@ React Native/Expo モバイルアプリケーションプロジェクト（iOS/A
 | ドキュメント                | 内容                     |
 | --------------------------- | ------------------------ |
 | `docs/SETUP.md`           | 開発環境セットアップ     |
-| `docs/BUILD_RELEASE.md`   | ビルド・リリース手順     |
+| `docs/BUILD_RELEASE.md`   | ビルド・デプロイ手順     |
 | `docs/TROUBLESHOOTING.md` | トラブルシューティング   |
 | `docs/requirements/`      | 要件定義書               |
 | `docs/tasks/`             | タスク管理・ToDo         |
@@ -54,12 +54,12 @@ React Native/Expo モバイルアプリケーションプロジェクト（iOS/A
 ## 環境変数
 
 ```
-EXPO_PUBLIC_FIREBASE_API_KEY
-EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN
-EXPO_PUBLIC_FIREBASE_PROJECT_ID
-EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET
-EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-EXPO_PUBLIC_FIREBASE_APP_ID
+NEXT_PUBLIC_FIREBASE_API_KEY
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+NEXT_PUBLIC_FIREBASE_PROJECT_ID
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+NEXT_PUBLIC_FIREBASE_APP_ID
 ```
 
 ## 知見蓄積のサイクル
@@ -89,13 +89,13 @@ EXPO_PUBLIC_FIREBASE_APP_ID
 | `docs/coding-rules.md`            | コード   | コーディング規約                 |
 | `docs/uiux.md`                    | デザイン | UI/UX設計ルール                  |
 | `docs/TROUBLESHOOTING.md`         | 運用     | エラー対処法                     |
-| `.claude/skills/dev-flow/`          | スキル   | 開発フロー統合（実装→コミット→PR）※旧pr-ready統合 |
-| `.claude/skills/feature-start/`     | スキル   | 新機能開始（ブランチ→タスク分割）※旧task-split統合 |
+| `.claude/skills/dev-flow/`          | スキル   | 開発フロー統合（実装→コミット→PR） |
+| `.claude/skills/feature-start/`     | スキル   | 新機能開始（ブランチ→タスク分割） |
 | `.claude/skills/git-commit/`        | スキル   | コミットメッセージ生成           |
 | `.claude/skills/hotfix/`            | スキル   | 緊急修正（hotfixブランチ→修正→即PR） |
-| `.claude/skills/release/`           | スキル   | リリース統合（ビルド→審査→変更履歴）※旧appstore-review統合 |
+| `.claude/skills/release/`           | スキル   | リリース統合（ビルド→デプロイ→変更履歴） |
 | `.claude/skills/code-review/`       | スキル   | コードレビュー（PR差分→分析→コメント） |
-| `.claude/skills/revenuecat-setup/`  | スキル   | RevenueCat + App Store Connect 課金設定 |
+| `.claude/skills/stripe-setup/`      | スキル   | Stripe 決済設定                  |
 | `.claude/skills/debugging-guide/`   | スキル   | デバッグ・トラブルシューティング |
 | `.claude/skills/uiux-test/`         | スキル   | UI/UXテスト作成ガイド            |
 | `.claude/skills/skill-name/`        | スキル   | スキル作成ガイド                 |

@@ -2,41 +2,77 @@
 
 ## 開発サーバー関連
 
-### Metro Bundler が起動しない
+### 開発サーバーが起動しない
 
-```powershell
-npx expo start --clear
+```bash
+# キャッシュクリアして再起動
+rm -rf .next
+npm run dev
 ```
 
-### "Unable to resolve module" エラー
+### "Module not found" エラー
 
-
-```powershell
-Remove-Item -Recurse -Force node_modules
+```bash
+rm -rf node_modules
 npm install
-npx expo start --clear
 ```
 
-## Android 関連
+### ポートが使用中
 
-### エミュレータが起動しない
+```bash
+# 別ポートで起動
+npm run dev -- --port 3001
 
-1. Android Studio > Virtual Device Manager
-2. 新しいエミュレータを作成
-3. API Level 24 以上を選択
-
-### "INSTALL_FAILED_INSUFFICIENT_STORAGE"
-
-1. Android Studio > Virtual Device Manager
-2. 該当デバイスの編集
-3. Show Advanced Settings > Internal Storage を増加
-
-### ADB 接続エラー
-
-```powershell
-adb kill-server
-adb start-server
+# または使用中のプロセスを確認して終了
+npx kill-port 3000
 ```
+
+## ビルド関連
+
+### ビルドエラー
+
+```bash
+# 型チェック
+npx tsc --noEmit
+
+# キャッシュクリアしてビルド
+rm -rf .next
+npm run build
+```
+
+### "window is not defined" エラー
+
+**原因**: Server Component で `window` や `document` にアクセスしている
+
+**解決**:
+1. `"use client"` ディレクティブを追加
+2. または `typeof window !== "undefined"` でガード
+3. または `useEffect` 内でアクセス
+
+```typescript
+"use client";
+
+import { useEffect, useState } from "react";
+
+export function WindowSize() {
+  const [width, setWidth] = useState(0);
+
+  useEffect(() => {
+    setWidth(window.innerWidth);
+  }, []);
+
+  return <p>Width: {width}</p>;
+}
+```
+
+### Hydration エラー
+
+**原因**: サーバーとクライアントのレンダリング結果が異なる
+
+**解決**:
+1. 日付やランダム値を `useEffect` で設定
+2. `suppressHydrationWarning` を使用（最終手段）
+3. `dynamic(() => import(...), { ssr: false })` でクライアントのみレンダリング
 
 ## Firebase 関連
 
@@ -44,14 +80,14 @@ adb start-server
 
 1. `lib/firebase.ts` の設定を確認
 2. 環境変数を確認:
-   ```powershell
-   echo $env:EXPO_PUBLIC_FIREBASE_API_KEY
+   ```bash
+   echo $NEXT_PUBLIC_FIREBASE_API_KEY
    ```
 
 ### Authentication エラー
 
 1. Firebase Console で認証プロバイダが有効か確認
-2. `google-services.json` が正しいか確認
+2. 認証ドメインが正しく設定されているか確認
 
 ### Firestore 権限エラー
 
@@ -68,164 +104,90 @@ service cloud.firestore {
 }
 ```
 
-## ビルド関連
+## Tailwind CSS 関連
 
-### EAS Build 失敗
+### スタイルが適用されない
 
-```powershell
-npx expo doctor
-npx expo install --check
+1. `tailwind.config.ts` の `content` パスを確認:
+```typescript
+const config = {
+  content: [
+    "./src/**/*.{js,ts,jsx,tsx,mdx}",
+  ],
+};
 ```
 
-### "SDK version mismatch" エラー
+2. クラス名にタイポがないか確認
+3. 開発サーバーを再起動
 
-```powershell
-npx expo install expo@latest
-npx expo install --fix
+### ダークモード切り替えが動かない
+
+1. `tailwind.config.ts` で `darkMode: "class"` を設定
+2. `<html>` タグに `dark` クラスが適用されているか確認
+3. `next-themes` の `ThemeProvider` を設定
+
+## デプロイ関連
+
+### Vercel デプロイ失敗
+
+```bash
+# ローカルでビルドテスト
+npm run build
+
+# 環境変数が設定されているか確認
+vercel env ls
 ```
 
-### ビルドしてもTestFlightに載らない
+### 本番で API が動かない
 
-**原因**: `eas build` はビルド作成のみ。TestFlightへのアップロードは別コマンド。
-
-**解決**:
-```powershell
-# ビルド後にサブミット
-eas submit --platform ios --latest
-
-# または、1コマンドで両方実行
-eas build --platform ios --profile production --auto-submit
-```
-
-### "Missing submit profile" エラー
-
-**原因**: `eas.json` に `submit` セクションがない
-
-**解決**: `eas.json` に追加:
-```json
-{
-  "build": { ... },
-  "submit": {
-    "production": {
-      "ios": {
-        "ascAppId": "YOUR_APP_ID"
-      }
-    }
-  }
-}
-```
-
-`ascAppId` は App Store Connect のアプリIDを入力。
-
----
-
-## RevenueCat / アプリ内課金
-
-### 「商品を取得できませんでした」
-
-**確認項目**:
-1. RevenueCat で Offering が作成されているか
-2. Offering が「Current」に設定されているか（青い✓マーク）
-3. Offering 内に Packages が追加されているか
-4. 環境変数 `EXPO_PUBLIC_REVENUECAT_API_KEY` が正しいか
-
-**解決**: RevenueCat ダッシュボードで Offerings 設定を確認
-
-### 「Could not check」エラー（RevenueCat Products）
-
-**原因**: RevenueCat が App Store Connect の商品を検証できない
-
-**確認項目**:
-1. Shared Secret が設定されているか
-   - RevenueCat → Apps & providers → アプリ → App-specific shared secret (Legacy)
-2. 商品IDが完全に一致しているか（大文字小文字も）
-3. App Store Connect の商品が「提出準備完了」か
-
-### Offering / Package 設定漏れ
-
-**必要な設定**:
-1. Products を追加（商品IDは App Store Connect と一致）
-2. Entitlements を作成し、Products を紐付け
-3. Offering を作成
-4. Offering 内に Packages を追加し、Products を選択
-5. Offering を「Make Current」に設定
-
-詳細は `/revenuecat-setup` スキルを参照。
-
----
-
-## App Store Connect
-
-### 商品ステータスが「提出準備完了」にならない
-
-**原因**: 必須項目が未入力
-
-**必須項目**:
-- [ ] 価格設定
-- [ ] 表示名（ローカライズ）
-- [ ] 説明（ローカライズ）
-- [ ] 審査用スクリーンショット（**よく忘れる**）
-
-### 共有シークレット（Shared Secret）の取得
-
-1. App Store Connect → アプリ → 一般 → アプリ情報
-2. 下にスクロール →「App用共有シークレット」→「管理」
-3. 「生成」をクリック
-4. 32文字のシークレットをコピー
-5. RevenueCat に設定
+1. 環境変数が Vercel に設定されているか確認
+2. API Routes のパスが正しいか確認
+3. Vercel のログを確認
 
 ## パフォーマンス関連
 
-### アプリが遅い・カクつく
+### ページ読み込みが遅い
 
-1. 開発モードでは遅い（正常）
-2. リリースビルドでテスト:
-   ```powershell
-   npx expo start --no-dev
+1. `next/image` で画像を最適化
+2. Server Components を活用
+3. 動的インポートで分割
+4. Lighthouse でスコアを確認:
+   ```
+   Chrome DevTools > Lighthouse > Generate report
    ```
 
-### メモリリーク
+### バンドルサイズが大きい
 
-1. useEffect のクリーンアップを確認
-2. リスナーの解除を確認
-3. React DevTools でコンポーネントを確認
+```bash
+# バンドル分析
+npm run build
+npx @next/bundle-analyzer
+```
 
 ## 型エラー関連
 
 ### TypeScript エラーが大量に出る
 
-```powershell
+```bash
 npx tsc --noEmit
-Remove-Item -Recurse -Force node_modules\.cache
+rm -rf node_modules/.cache
 npm install
-```
-
-### NativeWind の className が認識されない
-
-`tsconfig.json` を確認:
-
-```json
-{
-  "compilerOptions": {
-    "types": ["nativewind/types"]
-  }
-}
 ```
 
 ## リセット手順（最終手段）
 
-```powershell
-Remove-Item -Recurse -Force node_modules, .expo, android\.gradle, android\app\build -ErrorAction SilentlyContinue
+```bash
+rm -rf node_modules .next
 npm install
-npx expo start --clear
+npm run dev
 ```
 
 ## 問題が解決しない場合
 
 1. エラーメッセージで検索
-2. [Expo GitHub Issues](https://github.com/expo/expo/issues)
-3. [Expo Discord](https://chat.expo.dev/)
-4. [Stack Overflow](https://stackoverflow.com/questions/tagged/expo)
+2. [Next.js GitHub Issues](https://github.com/vercel/next.js/issues)
+3. [Next.js Discord](https://nextjs.org/discord)
+4. [Stack Overflow](https://stackoverflow.com/questions/tagged/next.js)
 
 ---
 

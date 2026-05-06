@@ -1,67 +1,53 @@
 
 
-# 技術スタック（React Native/Expo）
+# 技術スタック（Next.js Web App）
 
 ## フロントエンド
 
 ### コアテクノロジー
 
--**Expo** (SDK 52.x) - React Native 開発プラットフォーム
+-**Next.js** (v15.x) - React フルスタックフレームワーク（App Router）
 
--**React Native** (v0.76.x) - クロスプラットフォームモバイルフレームワーク
-
--**React** (v18.3.x) - UI ライブラリ
+-**React** (v19.x) - UI ライブラリ
 
 -**TypeScript** (v5.x) - 型付き JavaScript
 
-### ナビゲーション
+### ルーティング
 
--**Expo Router** (v4.x) - ファイルベースルーティング
+-**Next.js App Router** - ファイルベースルーティング
 
-- Stack, Tabs, Drawer ナビゲーション対応
-- ディープリンク対応
+- Server Components / Client Components 対応
+- Layouts, Loading, Error UI 対応
+- Parallel Routes, Intercepting Routes 対応
 
 ### UI コンポーネント
 
--**NativeWind** (v4.x) - Tailwind CSS for React Native
+-**Tailwind CSS** (v4.x) - ユーティリティファースト CSS フレームワーク
 
-- Tailwind の構文をそのまま使用可能
+-**shadcn/ui** - 再利用可能な UI コンポーネント集（Radix UI ベース）
 
--**Gluestack UI** または **Tamagui** - UIコンポーネントライブラリ（オプション）
+-**lucide-react** - アイコンライブラリ
 
--**lucide-react-native** - アイコンライブラリ
-
--**React Native Reanimated** (v3.x) - アニメーションライブラリ
-
--**React Native Gesture Handler** - ジェスチャー操作
+-**Framer Motion** (v11.x) - アニメーションライブラリ
 
 ### 状態管理
 
--**Zustand** (v4.x) - 軽量状態管理
+-**Zustand** (v5.x) - 軽量状態管理
 
 -**TanStack Query** (v5.x) - サーバー状態管理・キャッシュ
 
 ## バックエンド（Firebase）
 
 | サービス                 | 用途                                   |
-
 | ------------------------ | -------------------------------------- |
-
-| Firebase Authentication  | ユーザー認証（メール、Apple、Google）  |
-
+| Firebase Authentication  | ユーザー認証（メール、Google）         |
 | Cloud Firestore          | ユーザーデータ、お気に入り、履歴の保存 |
-
 | Firebase Storage         | ユーザーの写真保存                     |
-
-| Firebase Cloud Messaging | プッシュ通知                           |
-
 | Firebase Analytics       | 利用状況分析                           |
 
 ### Firebase SDK
 
 -**firebase** (v10.x) - Firebase JavaScript SDK
-
--**@react-native-async-storage/async-storage** - 認証状態の永続化
 
 ## フォーム処理
 
@@ -75,41 +61,17 @@
 
 -**date-fns** (v3.x) - 日付操作ライブラリ
 
-### ストレージ
+### 認証関連
 
--**@react-native-async-storage/async-storage** - ローカルストレージ
-
--**expo-secure-store** - セキュアストレージ（認証トークン等）
-
-### メディア
-
--**expo-image-picker** - 画像選択
-
--**expo-camera** - カメラ機能
-
--**expo-image** - 最適化された画像表示
+-**next-auth** (v5.x) - 認証ライブラリ（オプション）
 
 ### その他
 
--**expo-haptics** - 触覚フィードバック
-
--**expo-linking** - ディープリンク
-
--**expo-notifications** - プッシュ通知
-
--**expo-constants** - アプリ定数
-
-## 認証関連
-
--**expo-auth-session** - OAuth認証フロー
-
--**expo-apple-authentication** - Apple サインイン
-
--**expo-crypto** - 暗号化ユーティリティ
+-**clsx** / **tailwind-merge** - className 結合ユーティリティ
 
 ## 開発ツール
 
--**ESLint** (v8.x) - コード品質管理
+-**ESLint** (v9.x) - コード品質管理
 
 -**Prettier** (v3.x) - コードフォーマッター
 
@@ -117,83 +79,66 @@
 
 ## テスト
 
--**Jest** - ユニットテスト
+-**Vitest** - ユニットテスト
 
--**React Native Testing Library** - コンポーネントテスト
+-**Testing Library** (@testing-library/react) - コンポーネントテスト
 
--**Detox** (オプション) - E2Eテスト
+-**Playwright** (オプション) - E2Eテスト
 
 ## ビルド・デプロイメント
 
 ### 開発
 
--**Expo Go** - 開発中のプレビュー
-
--**expo-dev-client** - カスタム開発クライアント
+-**Next.js Dev Server** - 開発中のホットリロード
 
 ### 本番
 
--**EAS Build** - クラウドビルドサービス
+-**Vercel** - 推奨デプロイ先
 
--**EAS Submit** - App Store / Google Play 提出
+-**Docker** (オプション) - コンテナデプロイ
 
--**EAS Update** - OTA（Over-The-Air）アップデート
+## 対応ブラウザ
 
-## 対応プラットフォーム
-
--**iOS** 15.0+
-
--**Android** API 24+ (Android 7.0+)
+- Chrome (最新2バージョン)
+- Firefox (最新2バージョン)
+- Safari (最新2バージョン)
+- Edge (最新2バージョン)
 
 ## 特徴
 
-- ファイルベースルーティング（Expo Router）
-- クロスプラットフォーム対応（iOS/Android）
-- OTAアップデート対応
-- オフライン対応（Firestore永続化）
+- ファイルベースルーティング（App Router）
+- SSR / SSG / ISR 対応
+- Server Components によるパフォーマンス最適化
+- レスポンシブデザイン
 - 型安全性の確保
 - アクセシビリティ対応
 
 ## プロジェクト構造
 
 ```
-
 src/
-
-├── app/                    # Expo Router ページ
-
-│   ├── (tabs)/            # タブナビゲーション
-
-│   ├── (auth)/            # 認証画面
-
-│   └── _layout.tsx        # ルートレイアウト
-
+├── app/                    # Next.js App Router ページ
+│   ├── (auth)/            # 認証画面（レイアウトグループ）
+│   ├── (main)/            # メインコンテンツ
+│   ├── api/               # API Routes
+│   ├── layout.tsx         # ルートレイアウト
+│   └── page.tsx           # トップページ
 ├── components/            # 共通コンポーネント
-
-│   ├── ui/               # 基本UIコンポーネント
-
+│   ├── ui/               # shadcn/ui コンポーネント
 │   └── features/         # 機能別コンポーネント
-
 ├── contexts/             # React Context
-
 ├── hooks/                # カスタムフック
-
 ├── lib/                  # ユーティリティ
-
 │   ├── firebase.ts      # Firebase設定
-
 │   └── utils.ts         # ヘルパー関数
-
 ├── stores/               # Zustand ストア
-
 └── types/                # 型定義
-
 ```
 
 ## 重要な注意事項
 
 1.**技術スタックのバージョン変更は禁止** - 変更が必要な場合は理由を明確にして承認を得ること
 
-2. NativeWind は Tailwind CSS の構文をそのまま使用できるため、Web開発者も学習コストが低い
+2. shadcn/ui は Radix UI ベースのアクセシブルなコンポーネントを提供
 3. Firebase の各サービスは Firebase Console で事前に有効化が必要
-4. EAS Build/Submit は Expo アカウントが必要
+4. Vercel へのデプロイは GitHub リポジトリ連携が推奨
