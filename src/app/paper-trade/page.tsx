@@ -318,16 +318,16 @@ export default function PaperTradePage() {
                           <div className="flex items-center gap-1 flex-wrap">
                             <span>{trade.venue_name}{trade.race_number}R</span>
                             {trade.grade && (
-                              <span className={cn("rounded px-1 py-0.5 text-[9px] font-bold",
-                                trade.grade === "G1" ? "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200" :
-                                trade.grade === "G2" ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200" :
-                                trade.grade === "G3" ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200" :
-                                "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-200"
-                              )}>{trade.grade}</span>
+                              <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-bold",
+                                trade.grade === "G1" ? "bg-red-500 text-white" :
+                                trade.grade === "G2" ? "bg-blue-500 text-white" :
+                                trade.grade === "G3" ? "bg-green-600 text-white" :
+                                "bg-orange-400 text-white"
+                              )}>{{G1:"GⅠ",G2:"GⅡ",G3:"GⅢ",OP:"OP"}[trade.grade] ?? trade.grade}</span>
                             )}
                             {trade.race_name && (
-                              <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">
-                                {trade.race_name.replace(/\u3000/g, '').trim()}
+                              <span className="text-[10px] text-muted-foreground truncate max-w-[150px]">
+                                {trade.race_name}
                               </span>
                             )}
                           </div>
