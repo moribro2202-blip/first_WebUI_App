@@ -45,9 +45,11 @@ export type M7Prediction = {
   raceDate: string;
   venueName: string;
   raceNumber: number;
+  raceName: string | null;
   distance: number;
   surface: string;
   trackCondition: string | null;
+  weather: string | null;
   headCount: number;
   horses: M7HorseScore[];
   top3: number[];           // horse numbers
@@ -55,6 +57,7 @@ export type M7Prediction = {
   predBlend: number;        // predicted trio odds
   shouldBet: boolean;       // PredBlend <= threshold
   combination: string;      // "1-3-5" format
+  trioOdds: number | null;  // actual trio odds (for result checking)
 };
 
 // --- 1. Score Calculation ---
@@ -275,8 +278,8 @@ export function predictRace(raceId: string): M7Prediction | null {
   // Load race info
   const race = db.prepare("SELECT * FROM races WHERE race_id = ?").get(raceId) as {
     race_id: string; race_date: string; venue_code: string; venue_name: string;
-    race_number: number; distance: number; surface: string;
-    track_condition: string | null; head_count: number | null;
+    race_number: number; race_name: string | null; distance: number; surface: string;
+    track_condition: string | null; weather: string | null; head_count: number | null;
   } | undefined;
   if (!race) return null;
 
@@ -363,6 +366,11 @@ export function predictRace(raceId: string): M7Prediction | null {
   const trioProb = sternTrioProb(bp, top3Indices[0], top3Indices[1], top3Indices[2]);
   const predBlend = trioProb > 0 ? (1 / trioProb) * M7_CONFIG.takeout : 9999;
 
+  // Get actual trio odds for this combination
+  const trioRow = db.prepare(
+    "SELECT odds FROM odds WHERE race_id = ? AND bet_type = 'sanrenpuku' AND combination = ?"
+  ).get(raceId, top3.join("-")) as { odds: number } | undefined;
+
   // Sort horses by blended prob desc
   horseScores.sort((a, b) => b.blendedProb - a.blendedProb);
 
@@ -371,9 +379,11 @@ export function predictRace(raceId: string): M7Prediction | null {
     raceDate: race.race_date,
     venueName: race.venue_name,
     raceNumber: race.race_number,
+    raceName: race.race_name,
     distance: race.distance,
     surface: race.surface,
     trackCondition: race.track_condition,
+    weather: race.weather,
     headCount: race.head_count ?? entries.length,
     horses: horseScores,
     top3,
@@ -381,6 +391,7 @@ export function predictRace(raceId: string): M7Prediction | null {
     predBlend,
     shouldBet: predBlend <= M7_CONFIG.predBlendThreshold,
     combination: top3.join("-"),
+    trioOdds: trioRow?.odds ?? null,
   };
 }
 

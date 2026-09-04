@@ -29,9 +29,11 @@ type M7Race = {
   raceDate: string;
   venueName: string;
   raceNumber: number;
+  raceName: string | null;
   distance: number;
   surface: string;
   trackCondition: string | null;
+  weather: string | null;
   headCount: number;
   horses: M7Horse[];
   top3: number[];
@@ -39,6 +41,7 @@ type M7Race = {
   predBlend: number;
   shouldBet: boolean;
   combination: string;
+  trioOdds: number | null;
 };
 
 type DatePrediction = {
@@ -117,9 +120,10 @@ function RaceCard({ race }: { race: M7Race }) {
             )}
             <CardTitle className="text-sm">
               {race.venueName} {race.raceNumber}R
+              {race.raceName && <span className="ml-1 font-normal text-muted-foreground">{race.raceName.replace(/\u3000/g, '').trim()}</span>}
             </CardTitle>
             <span className="text-xs text-muted-foreground">
-              {race.surface}{race.distance}m {race.trackCondition ?? ""} {race.headCount}頭
+              {race.surface}{race.distance}m {race.trackCondition ?? ""} {race.weather ? `/${race.weather}` : ""} {race.headCount}頭
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -127,6 +131,7 @@ function RaceCard({ race }: { race: M7Race }) {
             {race.shouldBet && (
               <Badge variant="secondary" className="text-xs">
                 三連複 {race.combination} 的中率{(race.trioProb * 100).toFixed(1)}%
+                {race.trioOdds && <span className="ml-1">({race.trioOdds.toFixed(1)}倍)</span>}
               </Badge>
             )}
           </div>
