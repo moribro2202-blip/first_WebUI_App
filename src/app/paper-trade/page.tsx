@@ -21,6 +21,11 @@ type Trade = {
   payout: number | null;
   created_at: string;
   settled_at: string | null;
+  venue_name: string | null;
+  race_number: number | null;
+  race_name: string | null;
+  surface: string | null;
+  distance: number | null;
 };
 
 type Stats = {
@@ -292,7 +297,7 @@ export default function PaperTradePage() {
               <thead>
                 <tr className="border-b text-left text-muted-foreground">
                   <th className="px-2 py-1">日付</th>
-                  <th className="px-2 py-1">レースID</th>
+                  <th className="px-2 py-1">レース</th>
                   <th className="px-2 py-1">買い目</th>
                   <th className="px-2 py-1 text-right">オッズ</th>
                   <th className="px-2 py-1 text-right">投資</th>
@@ -306,8 +311,14 @@ export default function PaperTradePage() {
                   try { scoreInfo = trade.ai_score_json ? JSON.parse(trade.ai_score_json) : null; } catch {}
                   return (
                     <tr key={trade.id} className="border-b">
-                      <td className="px-2 py-1 font-mono">{trade.race_date}</td>
-                      <td className="px-2 py-1 font-mono">{trade.race_id}</td>
+                      <td className="px-2 py-1 font-mono text-muted-foreground">{trade.race_date}</td>
+                      <td className="px-2 py-1">
+                        {trade.venue_name ? (
+                          <span>{trade.venue_name}{trade.race_number}R</span>
+                        ) : (
+                          <span className="font-mono text-muted-foreground">{trade.race_id}</span>
+                        )}
+                      </td>
                       <td className="px-2 py-1">
                         <span className="font-mono">{trade.combination}</span>
                         {scoreInfo?.predBlend && (

@@ -78,9 +78,12 @@ export async function GET() {
       GROUP BY month ORDER BY month
     `).all();
 
-    // 直近の取引
+    // 直近の取引（レース名付き）
     const recent = db.prepare(`
-      SELECT * FROM paper_trades ORDER BY race_date DESC, race_id DESC LIMIT 200
+      SELECT pt.*, r.venue_name, r.race_number, r.race_name, r.surface, r.distance
+      FROM paper_trades pt
+      LEFT JOIN races r ON pt.race_id = r.race_id
+      ORDER BY pt.race_date DESC, pt.race_id DESC LIMIT 200
     `).all();
 
     return NextResponse.json({
