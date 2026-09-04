@@ -27,10 +27,10 @@ type FunBet = {
   type: string;
   label: string;
   combination: string;
-  horses: Array<{ num: number; name: string; score: number; prob: number }>;
-  expectedHitRate: number;
-  funLevel: number;
-  riskLevel: number;
+  horses: Array<{ num: number; name: string }>;
+  hitRate: number;
+  returnRate: number;
+  stars: number;
   description: string;
   odds?: number;
 };
@@ -68,64 +68,52 @@ const markColors: Record<string, string> = {
   "☆": "text-purple-500",
 };
 
-const riskIcons = ["", "🟢", "🟡", "🟠", "🔴", "💀"];
-const funIcons = ["", "😐", "🙂", "😊", "🎯", "🔥"];
-
-function RiskBar({ level }: { level: number }) {
+function StarRating({ stars }: { stars: number }) {
   return (
-    <div className="flex gap-0.5">
-      {[1,2,3,4,5].map(i => (
-        <div key={i} className={cn("h-2 w-3 rounded-sm", i <= level ? "bg-red-400" : "bg-muted")} />
-      ))}
-    </div>
+    <span className="text-yellow-500 text-xs">
+      {"★".repeat(stars)}{"☆".repeat(3 - stars)}
+    </span>
   );
 }
 
-function BetCard({ bet, index, budget }: { bet: FunBet; index: number; budget: number }) {
-  const isRecommended = bet.type === "wide" && bet.label.includes("◎-○");
-  // 予算に応じた掛け金: リスクレベルに反比例
-  const riskMultiplier = [0, 0.30, 0.25, 0.15, 0.10, 0.05][bet.riskLevel] ?? 0.10;
-  const points = bet.type === "sanrenpuku_4" ? 4 : 1;
-  const suggestedBet = Math.max(100, Math.floor(budget * riskMultiplier / points / 100) * 100);
+function BetCard({ bet }: { bet: FunBet }) {
+  const isPlus = bet.returnRate >= 100;
+  const isNearEven = bet.returnRate >= 95 && bet.returnRate < 100;
 
   return (
     <div className={cn(
       "rounded-lg border p-3 transition-all hover:shadow-sm",
-      isRecommended && "ring-2 ring-blue-400 bg-blue-50/50 dark:bg-blue-950/30"
+      isPlus && "ring-2 ring-green-400 bg-green-50/50 dark:bg-green-950/30",
+      isNearEven && "bg-yellow-50/30 dark:bg-yellow-950/20",
     )}>
       <div className="flex items-start justify-between mb-2">
-        <div>
+        <div className="flex-1">
           <div className="flex items-center gap-2">
-            <span className="text-lg">{funIcons[bet.funLevel]}</span>
+            <StarRating stars={bet.stars} />
             <span className="font-bold text-sm">{bet.label}</span>
-            {isRecommended && <Badge className="bg-blue-500 text-[10px]">おすすめ</Badge>}
+            {isPlus && <Badge className="bg-green-600 text-[10px]">プラス</Badge>}
+            {isNearEven && <Badge variant="outline" className="text-[10px] text-yellow-600 border-yellow-400">トントン</Badge>}
             {bet.odds && <Badge variant="outline" className="text-[10px] font-mono">{bet.odds.toFixed(1)}倍</Badge>}
           </div>
           <p className="text-[11px] text-muted-foreground mt-0.5">{bet.description}</p>
         </div>
-        <div className="text-right">
-          <div className="text-xs text-muted-foreground">的中期待</div>
-          <div className={cn("text-sm font-bold", bet.expectedHitRate >= 30 ? "text-green-600" : bet.expectedHitRate >= 15 ? "text-orange-500" : "text-red-500")}>
-            {bet.expectedHitRate.toFixed(0)}%
+        <div className="text-right ml-3">
+          <div className={cn("text-base font-bold", isPlus ? "text-green-600" : isNearEven ? "text-yellow-600" : "text-red-500")}>
+            {bet.returnRate.toFixed(1)}%
           </div>
+          <div className="text-[10px] text-muted-foreground">回収率</div>
         </div>
       </div>
       <div className="flex items-center justify-between">
-        <div className="flex gap-1.5">
+        <div className="flex gap-1.5 flex-wrap">
           {bet.horses.map(h => (
             <span key={h.num} className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">
               {h.num} {h.name}
             </span>
           ))}
         </div>
-        <div className="flex items-center gap-3">
-          <span className="rounded bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">
-            {points > 1 ? `各${suggestedBet.toLocaleString()}円×${points}点` : `${suggestedBet.toLocaleString()}円`}
-          </span>
-          <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-            <span>リスク</span>
-            <RiskBar level={bet.riskLevel} />
-          </div>
+        <div className="text-[11px] text-muted-foreground whitespace-nowrap ml-2">
+          的中率 {bet.hitRate.toFixed(0)}%
         </div>
       </div>
     </div>
@@ -139,7 +127,6 @@ export default function PredictPage() {
   const [prediction, setPrediction] = useState<PredictionData | null>(null);
   const [loading, setLoading] = useState(false);
   const [showAllHorses, setShowAllHorses] = useState(false);
-  const [budget, setBudget] = useState(10000);
 
   // Fetch races for date
   useEffect(() => {
@@ -299,28 +286,13 @@ export default function PredictPage() {
                 <Zap className="h-4 w-4 text-orange-500" />
                 おすすめの賭け方
               </CardTitle>
-              <div className="flex items-center gap-3">
-                <p className="text-xs text-muted-foreground">上から安全順。ワイド◎○がバランス◎</p>
-                <div className="flex items-center gap-1 ml-auto">
-                  <span className="text-xs text-muted-foreground">予算</span>
-                  {[3000, 5000, 10000, 30000, 50000].map(v => (
-                    <button
-                      key={v}
-                      onClick={() => setBudget(v)}
-                      className={cn(
-                        "rounded px-1.5 py-0.5 text-[10px] border",
-                        budget === v ? "bg-primary text-primary-foreground" : "hover:bg-muted"
-                      )}
-                    >
-                      {(v/10000>=1) ? `${v/10000}万` : `${v.toLocaleString()}`}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <p className="text-xs text-muted-foreground">
+                回収率は6年間5,350レースのシミュレーション実績。★★★=プラス実績あり
+              </p>
             </CardHeader>
             <CardContent className="space-y-2">
               {prediction.funBets.map((bet, i) => (
-                <BetCard key={i} bet={bet} index={i} budget={budget} />
+                <BetCard key={i} bet={bet} />
               ))}
             </CardContent>
           </Card>
