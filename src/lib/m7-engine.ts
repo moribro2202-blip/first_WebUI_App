@@ -46,6 +46,7 @@ export type M7Prediction = {
   venueName: string;
   raceNumber: number;
   raceName: string | null;
+  grade: string | null;
   distance: number;
   surface: string;
   trackCondition: string | null;
@@ -278,7 +279,8 @@ export function predictRace(raceId: string): M7Prediction | null {
   // Load race info
   const race = db.prepare("SELECT * FROM races WHERE race_id = ?").get(raceId) as {
     race_id: string; race_date: string; venue_code: string; venue_name: string;
-    race_number: number; race_name: string | null; distance: number; surface: string;
+    race_number: number; race_name: string | null; grade: string | null;
+    distance: number; surface: string;
     track_condition: string | null; weather: string | null; head_count: number | null;
   } | undefined;
   if (!race) return null;
@@ -380,6 +382,7 @@ export function predictRace(raceId: string): M7Prediction | null {
     venueName: race.venue_name,
     raceNumber: race.race_number,
     raceName: race.race_name,
+    grade: race.grade,
     distance: race.distance,
     surface: race.surface,
     trackCondition: race.track_condition,

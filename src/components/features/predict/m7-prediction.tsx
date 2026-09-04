@@ -30,6 +30,7 @@ type M7Race = {
   venueName: string;
   raceNumber: number;
   raceName: string | null;
+  grade: string | null;
   distance: number;
   surface: string;
   trackCondition: string | null;
@@ -120,6 +121,14 @@ function RaceCard({ race }: { race: M7Race }) {
             )}
             <CardTitle className="text-sm">
               {race.venueName} {race.raceNumber}R
+              {race.grade && (
+                <span className={cn("ml-1 rounded px-1.5 py-0.5 text-[10px] font-bold",
+                  race.grade === "G1" ? "bg-red-500 text-white" :
+                  race.grade === "G2" ? "bg-blue-500 text-white" :
+                  race.grade === "G3" ? "bg-green-600 text-white" :
+                  "bg-orange-400 text-white"
+                )}>{{G1:"GⅠ",G2:"GⅡ",G3:"GⅢ",OP:"OP"}[race.grade] ?? race.grade}</span>
+              )}
               {race.raceName && <span className="ml-1 font-normal text-muted-foreground">{race.raceName.replace(/\u3000/g, '').trim()}</span>}
             </CardTitle>
             <span className="text-xs text-muted-foreground">

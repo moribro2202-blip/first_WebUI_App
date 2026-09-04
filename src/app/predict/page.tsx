@@ -38,7 +38,7 @@ type FunBet = {
 type PredictionData = {
   race: {
     raceId: string; venueName: string; raceNumber: number;
-    raceName: string | null; distance: number; surface: string;
+    raceName: string | null; grade: string | null; distance: number; surface: string;
     trackCondition: string | null; weather: string | null; headCount: number;
   };
   ranking: RankedHorse[];
@@ -215,6 +215,14 @@ export default function PredictPage() {
               <CardTitle className="flex items-center gap-2 text-base">
                 <Trophy className="h-5 w-5 text-yellow-500" />
                 {prediction.race.venueName} {prediction.race.raceNumber}R
+                {prediction.race.grade && (
+                  <span className={cn("ml-1 rounded px-1.5 py-0.5 text-[10px] font-bold",
+                    prediction.race.grade === "G1" ? "bg-red-500 text-white" :
+                    prediction.race.grade === "G2" ? "bg-blue-500 text-white" :
+                    prediction.race.grade === "G3" ? "bg-green-600 text-white" :
+                    "bg-orange-400 text-white"
+                  )}>{{G1:"GⅠ",G2:"GⅡ",G3:"GⅢ",OP:"OP"}[prediction.race.grade] ?? prediction.race.grade}</span>
+                )}
                 {prediction.race.raceName && (
                   <span className="font-normal text-muted-foreground">
                     {prediction.race.raceName.replace(/\u3000/g, '').trim()}

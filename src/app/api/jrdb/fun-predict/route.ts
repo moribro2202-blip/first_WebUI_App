@@ -148,7 +148,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     race: {
       raceId: pred.raceId, venueName: pred.venueName, raceNumber: pred.raceNumber,
-      raceName: pred.raceName, distance: pred.distance, surface: pred.surface,
+      raceName: pred.raceName, grade: pred.grade, distance: pred.distance, surface: pred.surface,
       trackCondition: pred.trackCondition, weather: pred.weather, headCount: pred.headCount,
     },
     ranking: pred.horses.map((h, i) => ({
