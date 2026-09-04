@@ -46,6 +46,7 @@ type PredictionData = {
   shouldBet: boolean;
   trioProb: number;
   funBets: FunBet[];
+  comment: string;
 };
 
 type RaceListItem = {
@@ -234,6 +235,18 @@ export default function PredictPage() {
               </div>
             </CardHeader>
           </Card>
+
+          {/* AI Comment */}
+          {prediction.comment && (
+            <Card>
+              <CardContent className="pt-4">
+                <div className="flex gap-2">
+                  <BrainCircuit className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                  <p className="text-sm leading-relaxed">{prediction.comment}</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* AI Ranking */}
           <Card>

@@ -161,5 +161,57 @@ export async function GET(request: Request) {
     shouldBet: pred.shouldBet,
     trioProb: pred.trioProb,
     funBets,
+    comment: generateComment(pred),
   });
+}
+
+function generateComment(pred: ReturnType<typeof predictRace>): string {
+  if (!pred) return "";
+  const h = pred.horses;
+  if (h.length < 3) return "";
+  const top1 = h[0], top2 = h[1], top3 = h[2];
+  const gap12 = top1.blendedProb - top2.blendedProb;
+  const gap23 = top2.blendedProb - top3.blendedProb;
+  const top1pct = (top1.blendedProb * 100).toFixed(0);
+  const top2pct = (top2.blendedProb * 100).toFixed(0);
+
+  const parts: string[] = [];
+
+  // 本命の強さ
+  if (top1.blendedProb >= 0.40) {
+    parts.push(`${top1.horseName}が抜けた存在（${top1pct}%）。逆らいにくい一戦。`);
+  } else if (top1.blendedProb >= 0.30) {
+    parts.push(`${top1.horseName}が中心（${top1pct}%）だが、${top2.horseName}（${top2pct}%）も侮れない。`);
+  } else if (gap12 < 0.03) {
+    parts.push(`${top1.horseName}と${top2.horseName}が拮抗（${top1pct}% vs ${top2pct}%）。力差はほぼなし。`);
+  } else {
+    parts.push(`${top1.horseName}がやや優勢（${top1pct}%）。混戦模様。`);
+  }
+
+  // 脚質コメント
+  const styles = h.slice(0, 5).map(x => x.runStyle).filter(Boolean);
+  const escapeCount = styles.filter(s => s === '逃げ').length;
+  const oiCount = styles.filter(s => s === '追込').length;
+  if (escapeCount >= 2) {
+    parts.push("逃げ馬が複数いてペースが速くなりそう。差し馬に注目。");
+  } else if (escapeCount === 0 && oiCount >= 2) {
+    parts.push("逃げ馬不在でスローペースの可能性。先行馬有利か。");
+  }
+
+  // IDMコメント
+  if (top1.idm >= 60) {
+    parts.push(`${top1.horseName}のIDM ${top1.idm.toFixed(0)}は高水準。実力上位。`);
+  }
+  if (h.length >= 4 && h[3].idm > 0 && top1.idm - h[3].idm < 5) {
+    parts.push("上位の実力差が小さく波乱の余地あり。");
+  }
+
+  // PredBlend
+  if (pred.predBlend <= 4) {
+    parts.push("堅い決着が見込まれるレース。三連複◎○▲の的中率が高い。");
+  } else if (pred.predBlend >= 10) {
+    parts.push("混戦で予測が難しいレース。手広く買うか見送りが無難。");
+  }
+
+  return parts.join("");
 }
