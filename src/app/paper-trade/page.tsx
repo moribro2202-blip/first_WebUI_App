@@ -307,7 +307,7 @@ export default function PaperTradePage() {
                 </tr>
               </thead>
               <tbody>
-                {(showAll ? stats.recent : stats.recent.slice(0, 30)).map(trade => {
+                {(showAll ? stats.recent : stats.recent.slice(0, 100)).map(trade => {
                   let scoreInfo = null;
                   try { scoreInfo = trade.ai_score_json ? JSON.parse(trade.ai_score_json) : null; } catch {}
                   return (
@@ -315,17 +315,22 @@ export default function PaperTradePage() {
                       <td className="px-2 py-1 font-mono text-muted-foreground">{trade.race_date}</td>
                       <td className="px-2 py-1">
                         {trade.venue_name ? (
-                          <span>
-                            {trade.venue_name}{trade.race_number}R
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <span>{trade.venue_name}{trade.race_number}R</span>
                             {trade.grade && (
-                              <span className={cn("ml-1 rounded px-1 py-0.5 text-[9px] font-bold",
+                              <span className={cn("rounded px-1 py-0.5 text-[9px] font-bold",
                                 trade.grade === "G1" ? "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200" :
                                 trade.grade === "G2" ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200" :
                                 trade.grade === "G3" ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200" :
                                 "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-200"
                               )}>{trade.grade}</span>
                             )}
-                          </span>
+                            {trade.race_name && (
+                              <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">
+                                {trade.race_name.replace(/\u3000/g, '').trim()}
+                              </span>
+                            )}
+                          </div>
                         ) : (
                           <span className="font-mono text-muted-foreground">{trade.race_id}</span>
                         )}
