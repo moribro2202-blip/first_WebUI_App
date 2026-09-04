@@ -109,7 +109,10 @@ function RaceCard({ race }: { race: M7Race }) {
   return (
     <Card className={cn(
       "transition-all",
-      race.shouldBet && "ring-2 ring-green-500 dark:ring-green-400"
+      race.shouldBet && "ring-2 ring-green-500 dark:ring-green-400",
+      !race.shouldBet && race.grade === "G1" && "border-red-300",
+      !race.shouldBet && race.grade === "G2" && "border-blue-300",
+      !race.shouldBet && race.grade === "G3" && "border-green-400",
     )}>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
