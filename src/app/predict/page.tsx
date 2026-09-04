@@ -56,6 +56,7 @@ type RaceListItem = {
   venue_name: string;
   race_number: number;
   race_name: string | null;
+  grade: string | null;
   distance: number;
   surface: string;
   track_condition: string | null;
@@ -181,10 +182,24 @@ export default function PredictPage() {
                   onClick={() => handlePredict(r.race_id)}
                   className={cn(
                     "rounded-lg border p-2 text-left text-xs transition-all hover:shadow-sm",
-                    selectedRace === r.race_id ? "ring-2 ring-primary bg-primary/5" : "hover:bg-muted/50"
+                    selectedRace === r.race_id ? "ring-2 ring-primary bg-primary/5" : "hover:bg-muted/50",
+                    r.grade && r.grade.startsWith("G") && "border-2",
+                    r.grade === "G1" && "border-red-400",
+                    r.grade === "G2" && "border-blue-400",
+                    r.grade === "G3" && "border-green-500",
                   )}
                 >
-                  <div className="font-bold">{r.venue_name} {r.race_number}R</div>
+                  <div className="flex items-center gap-1">
+                    <span className="font-bold">{r.venue_name} {r.race_number}R</span>
+                    {r.grade && (
+                      <span className={cn("rounded px-1 py-0.5 text-[9px] font-bold",
+                        r.grade === "G1" ? "bg-red-500 text-white" :
+                        r.grade === "G2" ? "bg-blue-500 text-white" :
+                        r.grade === "G3" ? "bg-green-600 text-white" :
+                        "bg-orange-400 text-white"
+                      )}>{{G1:"GⅠ",G2:"GⅡ",G3:"GⅢ",OP:"OP"}[r.grade] ?? r.grade}</span>
+                    )}
+                  </div>
                   <div className="text-muted-foreground">
                     {r.surface}{r.distance}m {r.track_condition ?? ""}
                   </div>
