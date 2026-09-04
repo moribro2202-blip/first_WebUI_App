@@ -36,3 +36,6 @@ coverage/
 # Claude Code MCP settings (contains tokens)
 .claude/settings.json
 .claude/settings.local.json
+
+# JRDB data
+data/
