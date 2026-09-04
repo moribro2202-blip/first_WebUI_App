@@ -164,6 +164,13 @@ export async function GET(request: Request) {
     }
   }
 
+  // Get win odds for all horses
+  const winOddsRows = db.prepare(
+    "SELECT combination, odds FROM odds WHERE race_id = ? AND bet_type = 'win'"
+  ).all(raceId) as Array<{ combination: string; odds: number }>;
+  const winOddsMap = new Map<number, number>();
+  for (const r of winOddsRows) winOddsMap.set(parseInt(r.combination), r.odds);
+
   return NextResponse.json({
     race: {
       raceId: pred.raceId,
@@ -179,6 +186,7 @@ export async function GET(request: Request) {
     ranking: pred.horses.map((h, i) => ({
       rank: i + 1,
       mark: i === 0 ? "◎" : i === 1 ? "○" : i === 2 ? "▲" : i === 3 ? "△" : i === 4 ? "☆" : "",
+      winOdds: winOddsMap.get(h.horseNumber) ?? null,
       ...h,
     })),
     predBlend: pred.predBlend,

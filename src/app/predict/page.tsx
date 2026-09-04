@@ -20,6 +20,7 @@ type RankedHorse = {
   blendedProb: number;
   modelProb: number;
   marketProb: number;
+  winOdds: number | null;
 };
 
 type FunBet = {
@@ -254,6 +255,9 @@ export default function PredictPage() {
                     <span className="text-xs text-muted-foreground">{h.jockeyName}</span>
                     {h.runStyle && (
                       <Badge variant="outline" className="text-[10px]">{h.runStyle}</Badge>
+                    )}
+                    {h.winOdds && (
+                      <span className="w-12 text-right font-mono text-xs text-muted-foreground">{h.winOdds.toFixed(1)}倍</span>
                     )}
                     <span className="w-10 text-right font-mono text-xs text-muted-foreground">IDM {h.idm.toFixed(0)}</span>
                     <div className="w-16">
