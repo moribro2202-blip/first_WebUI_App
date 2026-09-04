@@ -26,6 +26,7 @@ type Trade = {
   race_name: string | null;
   surface: string | null;
   distance: number | null;
+  grade: string | null;
 };
 
 type Stats = {
@@ -314,7 +315,17 @@ export default function PaperTradePage() {
                       <td className="px-2 py-1 font-mono text-muted-foreground">{trade.race_date}</td>
                       <td className="px-2 py-1">
                         {trade.venue_name ? (
-                          <span>{trade.venue_name}{trade.race_number}R</span>
+                          <span>
+                            {trade.venue_name}{trade.race_number}R
+                            {trade.grade && (
+                              <span className={cn("ml-1 rounded px-1 py-0.5 text-[9px] font-bold",
+                                trade.grade === "G1" ? "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200" :
+                                trade.grade === "G2" ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200" :
+                                trade.grade === "G3" ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200" :
+                                "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-200"
+                              )}>{trade.grade}</span>
+                            )}
+                          </span>
                         ) : (
                           <span className="font-mono text-muted-foreground">{trade.race_id}</span>
                         )}
