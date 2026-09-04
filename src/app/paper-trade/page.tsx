@@ -301,7 +301,7 @@ export default function PaperTradePage() {
                 </tr>
               </thead>
               <tbody>
-                {(showAll ? stats.recent : stats.recent.slice(0, 10)).map(trade => {
+                {(showAll ? stats.recent : stats.recent.slice(0, 30)).map(trade => {
                   let scoreInfo = null;
                   try { scoreInfo = trade.ai_score_json ? JSON.parse(trade.ai_score_json) : null; } catch {}
                   return (
