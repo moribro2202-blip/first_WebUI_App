@@ -81,8 +81,13 @@ function RiskBar({ level }: { level: number }) {
   );
 }
 
-function BetCard({ bet, index }: { bet: FunBet; index: number }) {
+function BetCard({ bet, index, budget }: { bet: FunBet; index: number; budget: number }) {
   const isRecommended = bet.type === "wide" && bet.label.includes("◎-○");
+  // 予算に応じた掛け金: リスクレベルに反比例
+  const riskMultiplier = [0, 0.30, 0.25, 0.15, 0.10, 0.05][bet.riskLevel] ?? 0.10;
+  const points = bet.type === "sanrenpuku_4" ? 4 : 1;
+  const suggestedBet = Math.max(100, Math.floor(budget * riskMultiplier / points / 100) * 100);
+
   return (
     <div className={cn(
       "rounded-lg border p-3 transition-all hover:shadow-sm",
@@ -113,9 +118,14 @@ function BetCard({ bet, index }: { bet: FunBet; index: number }) {
             </span>
           ))}
         </div>
-        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-          <span>リスク</span>
-          <RiskBar level={bet.riskLevel} />
+        <div className="flex items-center gap-3">
+          <span className="rounded bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">
+            {points > 1 ? `各${suggestedBet.toLocaleString()}円×${points}点` : `${suggestedBet.toLocaleString()}円`}
+          </span>
+          <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+            <span>リスク</span>
+            <RiskBar level={bet.riskLevel} />
+          </div>
         </div>
       </div>
     </div>
@@ -129,6 +139,7 @@ export default function PredictPage() {
   const [prediction, setPrediction] = useState<PredictionData | null>(null);
   const [loading, setLoading] = useState(false);
   const [showAllHorses, setShowAllHorses] = useState(false);
+  const [budget, setBudget] = useState(10000);
 
   // Fetch races for date
   useEffect(() => {
@@ -288,13 +299,28 @@ export default function PredictPage() {
                 <Zap className="h-4 w-4 text-orange-500" />
                 おすすめの賭け方
               </CardTitle>
-              <p className="text-xs text-muted-foreground">
-                上から安全順。ワイド◎○がバランス◎
-              </p>
+              <div className="flex items-center gap-3">
+                <p className="text-xs text-muted-foreground">上から安全順。ワイド◎○がバランス◎</p>
+                <div className="flex items-center gap-1 ml-auto">
+                  <span className="text-xs text-muted-foreground">予算</span>
+                  {[3000, 5000, 10000, 30000, 50000].map(v => (
+                    <button
+                      key={v}
+                      onClick={() => setBudget(v)}
+                      className={cn(
+                        "rounded px-1.5 py-0.5 text-[10px] border",
+                        budget === v ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                      )}
+                    >
+                      {(v/10000>=1) ? `${v/10000}万` : `${v.toLocaleString()}`}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="space-y-2">
               {prediction.funBets.map((bet, i) => (
-                <BetCard key={i} bet={bet} index={i} />
+                <BetCard key={i} bet={bet} index={i} budget={budget} />
               ))}
             </CardContent>
           </Card>

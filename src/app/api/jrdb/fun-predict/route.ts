@@ -186,8 +186,8 @@ export async function GET(request: Request) {
     ranking: pred.horses.map((h, i) => ({
       rank: i + 1,
       mark: i === 0 ? "◎" : i === 1 ? "○" : i === 2 ? "▲" : i === 3 ? "△" : i === 4 ? "☆" : "",
-      winOdds: winOddsMap.get(h.horseNumber) ?? null,
       ...h,
+      winOdds: winOddsMap.get(h.horseNumber) ?? null,
     })),
     predBlend: pred.predBlend,
     shouldBet: pred.shouldBet,
