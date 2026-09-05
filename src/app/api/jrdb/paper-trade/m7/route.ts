@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
       const trioRow = db.prepare(
         "SELECT odds FROM odds WHERE race_id = ? AND bet_type = 'sanrenpuku' AND combination = ?"
       ).get(pred.raceId, pred.combination) as { odds: number } | undefined;
-      const trioOdds = trioRow?.odds ?? 0;
+      const trioOdds = trioRow?.odds ?? null;
 
       const scoreJson = JSON.stringify({
         model: "M7",
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       stmt.run(
         pred.raceId, date, pred.combination,
         betAmount,
-        trioOdds > 0 ? trioOdds : null,
+        trioOdds && trioOdds > 0 ? trioOdds : null,
         pred.trioProb,
         scoreJson,
       );
