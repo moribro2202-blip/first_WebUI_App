@@ -4,6 +4,57 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Print styles */
+@media print {
+  /* Hide sidebar, header, buttons */
+  aside, header, nav,
+  button, [role="button"],
+  .no-print {
+    display: none !important;
+  }
+
+  /* Full width content */
+  main, [class*="flex"] > div:last-child {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0.5rem !important;
+  }
+
+  /* Remove shadows, borders, rings */
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Expand all collapsed content */
+  [data-state="closed"] {
+    display: block !important;
+  }
+
+  /* Cards: remove background, keep border */
+  [class*="card"] {
+    break-inside: avoid;
+    border: 1px solid #ccc !important;
+    background: white !important;
+  }
+
+  /* Badge colors for print */
+  [class*="bg-green"] { background: #dcfce7 !important; color: #166534 !important; }
+  [class*="bg-red"] { background: #fee2e2 !important; color: #991b1b !important; }
+  [class*="bg-blue"] { background: #dbeafe !important; color: #1e40af !important; }
+  [class*="bg-orange"] { background: #ffedd5 !important; color: #9a3412 !important; }
+
+  /* Font size */
+  body { font-size: 11px !important; }
+
+  /* Page margins */
+  @page {
+    margin: 1cm;
+    size: A4;
+  }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
