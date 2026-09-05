@@ -78,6 +78,17 @@ export async function GET() {
       GROUP BY month ORDER BY month
     `).all();
 
+    // 日別
+    const byDay = db.prepare(`
+      SELECT race_date as day,
+        SUM(amount) as invested,
+        SUM(payout) as payout,
+        SUM(CASE WHEN result='hit' THEN 1 ELSE 0 END) as hits,
+        COUNT(*) as count
+      FROM paper_trades WHERE result != 'pending'
+      GROUP BY day ORDER BY day
+    `).all();
+
     // 直近の取引（レース名付き）
     const recent = db.prepare(`
       SELECT pt.*, r.venue_name, r.race_number, r.race_name, r.surface, r.distance, r.grade
@@ -90,6 +101,7 @@ export async function GET() {
       total,
       byType,
       byMonth,
+      byDay,
       recent,
       recoveryRate: total.total_invested > 0
         ? Math.round((total.total_payout / total.total_invested) * 1000) / 10
