@@ -284,6 +284,96 @@ export default function PaperTradePage() {
         </Card>
       )}
 
+      {/* Charts */}
+      {stats?.byMonth && stats.byMonth.length > 1 && (
+        <div className="grid gap-4 md:grid-cols-2">
+          {/* Cumulative PnL chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">累積損益推移</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {(() => {
+                let cumPnl = 0;
+                const points = stats.byMonth.map(m => {
+                  cumPnl += (m.payout ?? 0) - m.invested;
+                  return { month: m.month, pnl: cumPnl };
+                });
+                const maxAbs = Math.max(...points.map(p => Math.abs(p.pnl)), 1);
+                const chartH = 160;
+                const midY = chartH / 2;
+                return (
+                  <div className="relative" style={{ height: chartH }}>
+                    {/* Zero line */}
+                    <div className="absolute left-0 right-0 border-t border-dashed border-muted-foreground/30" style={{ top: midY }} />
+                    {/* Bars */}
+                    <div className="flex items-center h-full gap-0.5">
+                      {points.map((p, i) => {
+                        const h = Math.abs(p.pnl) / maxAbs * (chartH / 2 - 4);
+                        const isPos = p.pnl >= 0;
+                        return (
+                          <div key={p.month} className="flex-1 flex flex-col items-center justify-center relative" style={{ height: chartH }}>
+                            <div
+                              className={cn("w-full rounded-sm min-w-[4px] absolute", isPos ? "bg-green-500" : "bg-red-400")}
+                              style={{
+                                height: Math.max(2, h),
+                                bottom: isPos ? undefined : undefined,
+                                top: isPos ? midY - h : midY,
+                              }}
+                              title={`${p.month}: ${p.pnl >= 0 ? "+" : ""}${p.pnl.toLocaleString()}円`}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {/* Labels */}
+                    <div className="flex justify-between mt-1">
+                      <span className="text-[8px] text-muted-foreground">{points[0]?.month.slice(2)}</span>
+                      <span className={cn("text-[10px] font-bold", (cumPnl >= 0 ? "text-green-600" : "text-red-500"))}>
+                        {cumPnl >= 0 ? "+" : ""}{(cumPnl / 10000).toFixed(1)}万
+                      </span>
+                      <span className="text-[8px] text-muted-foreground">{points[points.length-1]?.month.slice(2)}</span>
+                    </div>
+                  </div>
+                );
+              })()}
+            </CardContent>
+          </Card>
+
+          {/* Monthly RR chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">月別回収率</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1">
+                {stats.byMonth.map(m => {
+                  const mRR = m.invested > 0 ? (m.payout / m.invested * 100) : 0;
+                  const barW = Math.min(100, Math.max(3, mRR / 2));
+                  return (
+                    <div key={m.month} className="flex items-center gap-2 text-[11px]">
+                      <span className="w-14 text-right font-mono text-muted-foreground">{m.month}</span>
+                      <div className="h-3.5 flex-1 overflow-hidden rounded bg-muted relative">
+                        {/* 100% line */}
+                        <div className="absolute top-0 bottom-0 w-px bg-muted-foreground/40" style={{ left: '50%' }} />
+                        <div
+                          className={cn("h-full rounded transition-all", mRR >= 100 ? "bg-green-500" : "bg-red-400")}
+                          style={{ width: `${barW}%` }}
+                        />
+                      </div>
+                      <span className={cn("w-12 text-right font-mono font-medium", mRR >= 100 ? "text-green-600" : "text-red-500")}>
+                        {mRR.toFixed(0)}%
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-1 text-[9px] text-muted-foreground text-center">縦線 = 100%（損益分岐点）</div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Recent trades */}
       {stats?.recent && stats.recent.length > 0 && (
         <Card>
