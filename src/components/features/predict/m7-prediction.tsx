@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Target, TrendingUp, TrendingDown, CircleDot, Loader2 } from "lucide-react";
+import { Target, TrendingUp, TrendingDown, CircleDot, Loader2, Printer } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -335,6 +335,66 @@ export function M7PredictionPanel() {
                 className="text-xs"
               >
                 {showAll ? "BETのみ表示" : "全レース表示"}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs"
+                onClick={() => {
+                  const bets = data.predictions.filter(p => p.shouldBet);
+                  const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>M7予測 ${date}</title>
+<style>
+  body{font-family:'Hiragino Sans','Meiryo',sans-serif;font-size:11px;margin:20px;color:#333}
+  h1{font-size:16px;border-bottom:2px solid #333;padding-bottom:4px;margin-bottom:8px}
+  .summary{display:flex;gap:20px;margin-bottom:12px;font-size:12px}
+  .summary b{color:#16a34a}
+  table{width:100%;border-collapse:collapse;margin-bottom:16px;page-break-inside:avoid}
+  th,td{border:1px solid #ccc;padding:3px 6px;text-align:left;font-size:10px}
+  th{background:#f5f5f5;font-weight:bold}
+  .race-header{background:#f0fdf4;font-size:12px;font-weight:bold;padding:6px;margin-top:12px;border-left:4px solid #16a34a}
+  .race-header.skip{background:#f5f5f5;border-left-color:#999}
+  .grade{display:inline-block;padding:1px 5px;border-radius:3px;color:white;font-size:9px;font-weight:bold;margin-left:4px}
+  .g1{background:#ef4444}.g2{background:#3b82f6}.g3{background:#16a34a}.op{background:#f97316}
+  .bet{color:#16a34a;font-weight:bold}
+  .mark{font-weight:bold;font-size:12px}
+  .mark-h{color:#dc2626}.mark-o{color:#2563eb}.mark-t{color:#16a34a}
+  @page{margin:1cm;size:A4}
+  @media print{body{margin:0}}
+</style></head><body>
+<h1>M7予測 ${date}</h1>
+<div class="summary">
+  <span>全${data.total}R</span>
+  <span><b>BET ${data.shouldBet}R</b></span>
+  <span>SKIP ${data.total - data.shouldBet}R</span>
+  <span>投資額 ${(data.shouldBet * 10000).toLocaleString()}円</span>
+</div>
+${data.predictions.sort((a: M7Race, b: M7Race) => (a.startTime ?? '').localeCompare(b.startTime ?? '')).map((r: M7Race) => {
+  const gradeHtml = r.grade ? `<span class="grade ${r.grade === 'G1' ? 'g1' : r.grade === 'G2' ? 'g2' : r.grade === 'G3' ? 'g3' : 'op'}">${({G1:'GⅠ',G2:'GⅡ',G3:'GⅢ',OP:'OP'} as Record<string,string>)[r.grade] ?? r.grade}</span>` : '';
+  const raceName = r.raceName ? r.raceName.replace(/\u3000/g,'').trim() : '';
+  return `<div class="race-header ${r.shouldBet ? '' : 'skip'}">
+  ${r.startTime ?? ''} ${r.venueName}${r.raceNumber}R ${gradeHtml} ${raceName}
+  ${r.surface}${r.distance}m ${r.trackCondition ?? ''} ${r.headCount}頭
+  — PB=${r.predBlend.toFixed(1)} ${r.shouldBet ? '<span class="bet">◆ BET 三連複 ' + r.top3.join('-') + ' 的中率' + (r.trioProb*100).toFixed(1) + '%' + (r.trioOdds ? ' (' + r.trioOdds.toFixed(1) + '倍)' : '') + '</span>' : 'SKIP'}
+</div>
+<table><tr><th></th><th>#</th><th>馬名</th><th>騎手</th><th>IDM</th><th>騎手指</th><th>脚質</th><th>Score</th><th>Blend</th></tr>
+${r.horses.slice(0, r.shouldBet ? 5 : 3).map((h: M7Horse, i: number) => {
+  const mark = r.top3.includes(h.horseNumber) ? (['◎','○','▲'][r.top3.indexOf(h.horseNumber)] ?? '') : '';
+  const markClass = mark === '◎' ? 'mark-h' : mark === '○' ? 'mark-o' : mark === '▲' ? 'mark-t' : '';
+  return `<tr><td class="mark ${markClass}">${mark}</td><td>${h.horseNumber}</td><td>${h.horseName}</td><td>${h.jockeyName}</td><td>${h.idm.toFixed(0)}</td><td>${h.riderIndex.toFixed(1)}</td><td>${h.runStyle??'-'}</td><td>${h.totalScore.toFixed(1)}</td><td>${(h.blendedProb*100).toFixed(1)}%</td></tr>`;
+}).join('')}
+</table>`;
+}).join('')}
+<div style="margin-top:20px;font-size:9px;color:#999;border-top:1px solid #eee;padding-top:4px">
+  M7 v25 Stern補正 | PredBlend≤8 | α=0.50 | 出力: ${new Date().toLocaleString('ja-JP')}
+</div>
+</body></html>`;
+                  const win = window.open('', '_blank');
+                  if (win) { win.document.write(html); win.document.close(); win.print(); }
+                }}
+              >
+                <Printer className="mr-1 h-3 w-3" />
+                PDF出力
               </Button>
               <div className="flex items-center gap-1 ml-2">
                 {([["time","時刻順"],["venue","会場順"],["grade","重賞順"],["predblend","確信度順"]] as const).map(([mode, label]) => (
