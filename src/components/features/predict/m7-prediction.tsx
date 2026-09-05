@@ -375,7 +375,7 @@ ${data.predictions.sort((a: M7Race, b: M7Race) => (a.startTime ?? '').localeComp
   return `<div class="race-header ${r.shouldBet ? '' : 'skip'}">
   ${r.startTime ?? ''} ${r.venueName}${r.raceNumber}R ${gradeHtml} ${raceName}
   ${r.surface}${r.distance}m ${r.trackCondition ?? ''} ${r.headCount}頭
-  — PB=${r.predBlend.toFixed(1)} ${r.shouldBet ? '<span class="bet">◆ BET 三連複 ' + r.top3.join('-') + ' 的中率' + (r.trioProb*100).toFixed(1) + '%' + (r.trioOdds ? ' (' + r.trioOdds.toFixed(1) + '倍)' : '') + '</span>' : 'SKIP'}
+  — PB=${r.predBlend.toFixed(1)} ${r.shouldBet ? '<span class="bet">◆ BET 三連複 ' + r.top3.join('-') + ' 的中率' + (r.trioProb*100).toFixed(1) + '%</span>' : 'SKIP'}
 </div>
 <table><tr><th></th><th>#</th><th>馬名</th><th>騎手</th><th>IDM</th><th>騎手指</th><th>脚質</th><th>Score</th><th>Blend</th></tr>
 ${r.horses.slice(0, r.shouldBet ? 5 : 3).map((h: M7Horse, i: number) => {
