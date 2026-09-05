@@ -35,6 +35,7 @@ type M7Race = {
   surface: string;
   trackCondition: string | null;
   weather: string | null;
+  startTime: string | null;
   headCount: number;
   horses: M7Horse[];
   top3: number[];
@@ -135,6 +136,7 @@ function RaceCard({ race }: { race: M7Race }) {
               {race.raceName && <span className="ml-1 font-normal text-muted-foreground">{race.raceName.replace(/\u3000/g, '').trim()}</span>}
             </CardTitle>
             <span className="text-xs text-muted-foreground">
+              {race.startTime && <span className="font-mono mr-1">{race.startTime}</span>}
               {race.surface}{race.distance}m {race.trackCondition ?? ""} {race.weather ? `/${race.weather}` : ""} {race.headCount}頭
             </span>
           </div>
@@ -250,11 +252,14 @@ function RaceCard({ race }: { race: M7Race }) {
   );
 }
 
+type SortMode = "time" | "venue" | "grade" | "predblend";
+
 export function M7PredictionPanel() {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [data, setData] = useState<DatePrediction | null>(null);
   const [loading, setLoading] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [sortMode, setSortMode] = useState<SortMode>("time");
 
   const handlePredict = async () => {
     setLoading(true);
@@ -269,10 +274,28 @@ export function M7PredictionPanel() {
     }
   };
 
+  const gradeOrder: Record<string, number> = { "G1": 0, "G2": 1, "G3": 2, "OP": 3 };
+
+  const sortFn = (a: M7Race, b: M7Race) => {
+    switch (sortMode) {
+      case "time":
+        return (a.startTime ?? "99:99").localeCompare(b.startTime ?? "99:99");
+      case "venue":
+        return a.venueName.localeCompare(b.venueName) || a.raceNumber - b.raceNumber;
+      case "grade": {
+        const ga = a.grade ? (gradeOrder[a.grade] ?? 9) : 9;
+        const gb = b.grade ? (gradeOrder[b.grade] ?? 9) : 9;
+        return ga - gb || (a.startTime ?? "99:99").localeCompare(b.startTime ?? "99:99");
+      }
+      case "predblend":
+        return a.predBlend - b.predBlend;
+      default:
+        return 0;
+    }
+  };
+
   const displayed = data?.predictions
-    ? showAll
-      ? data.predictions
-      : data.predictions.filter(p => p.shouldBet)
+    ? (showAll ? [...data.predictions] : data.predictions.filter(p => p.shouldBet)).sort(sortFn)
     : [];
 
   return (
@@ -313,6 +336,20 @@ export function M7PredictionPanel() {
               >
                 {showAll ? "BETのみ表示" : "全レース表示"}
               </Button>
+              <div className="flex items-center gap-1 ml-2">
+                {([["time","時刻順"],["venue","会場順"],["grade","重賞順"],["predblend","確信度順"]] as const).map(([mode, label]) => (
+                  <button
+                    key={mode}
+                    onClick={() => setSortMode(mode)}
+                    className={cn(
+                      "rounded px-2 py-0.5 text-[10px] border transition-colors",
+                      sortMode === mode ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </CardContent>
