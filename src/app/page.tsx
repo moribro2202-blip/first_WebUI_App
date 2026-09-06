@@ -6,6 +6,7 @@ import { StatsCards } from "@/components/features/dashboard/stats-cards";
 import { BetTypeStats } from "@/components/features/dashboard/bet-type-stats";
 import { RecentPredictions } from "@/components/features/dashboard/recent-predictions";
 import { M7DashboardStats } from "@/components/features/dashboard/m7-stats";
+import { OpsChecklist } from "@/components/features/dashboard/ops-checklist";
 import { getPredictions, getResults, getResultByPredictionId } from "@/lib/storage";
 import { calcOverallStats, calcPerformanceStats } from "@/lib/calc-stats";
 import type { Prediction, RaceResult } from "@/types";
@@ -39,6 +40,7 @@ export default function DashboardPage() {
         <h2 className="text-2xl font-bold">ダッシュボード</h2>
       </div>
 
+      <OpsChecklist />
       <M7DashboardStats />
       <StatsCards stats={overall} />
       <BetTypeStats stats={betStats} />
