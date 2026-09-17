@@ -912,16 +912,10 @@ def main():
             log(f"  馬番{pred['horse_number']:>2} odds={pred['odds']:>5.1f} P={pred['model_prob']:.3f} EV={pred['ev']:.3f} move={pred['move']:+.3f}")
 
         if best_type:
-            if best_type == 'portfolio':
-                n_trio = sum(1 for b in best_bets if b['bet_type'] == 'sanrenpuku')
-                n_tri = sum(1 for b in best_bets if b['bet_type'] == 'sanrentan')
-                log(f"  ★ ポートフォリオ: 三連複{n_trio}点+三連単{n_tri}点 — {selection['reason']}")
-            else:
-                bt_jp = BET_TYPE_JP.get(best_type, best_type)
-                log(f"  ★ 選択: {bt_jp} {len(best_bets)}点 — {selection['reason']}")
+            bt_jp = BET_TYPE_JP.get(best_type, best_type)
+            log(f"  ★ 選択: {bt_jp} {len(best_bets)}点 — {selection['reason']}")
             for b in best_bets[:5]:
-                bt_jp_b = BET_TYPE_JP.get(b['bet_type'], b['bet_type'])
-                log(f"    [{bt_jp_b}] {b['combo']} EV={b['ev']:.3f} P={b['model_prob']:.4f} odds≈{b['est_odds']:.0f}")
+                log(f"    {b['combo']} EV={b['ev']:.3f} P={b['model_prob']:.4f} odds≈{b['est_odds']:.0f}")
             if len(best_bets) > 5:
                 log(f"    ...他{len(best_bets)-5}点")
         else:

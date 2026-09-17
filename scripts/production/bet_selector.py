@@ -1,18 +1,18 @@
 # -*- coding: utf-8 -*-
-"""券種自動選択エンジン
+"""券種自動選択エンジン v23
+
 1レースの予測結果から、最適な券種と買い目を選択する。
 
-選択ロジック:
-  1. 全券種のEVを計算
-  2. レースの条件（1着率、複勝率）で場合分け
-  3. 1レース予算内で最も期待利益が高い券種を選択
-
-券種:
-  - 単勝: モデル勝率 × 3分前オッズ
-  - 馬連: SH確率 × 推定オッズ（トリオ残差モデルなし）
-  - 馬単: SH順列確率 × 推定オッズ（1着固定時）
-  - 三連複: トリオ残差モデル確率 × 推定オッズ
-  - 三連単: SH順列確率 × 推定オッズ（1着固定流し）
+v23 戦略:
+  1. トリオモデル(or SH)で三連複候補を生成（EV>=1.0、1番人気含む）
+  2. 単勝モデルの勝率で3頭内の着順予測（◎=1着率最高、○=2番目）
+  3. 頭数による券種切替:
+     - 12頭以上: 三連単1-2着流し(4点) + 三連複(1点) = 5点×100円 = 500円/トリオ
+       三連単: ◎→○→▲, ◎→▲→○, ○→◎→▲, ○→▲→◎
+       三連複: 1組（保険）
+     - 12頭未満: 三連複のみ = 1点×100円 = 100円/トリオ
+  4. EV順にトリオを選択、race_budget内で収まるだけ
+  5. フォールバック: トリオ候補がなければ単勝（EV>=1.2, 2-40倍）
 
 注意: 推定オッズは確定オッズと乖離する（Fable警告）。
       ペーパー記録で実測してから実弾に移行すること。
@@ -80,7 +80,7 @@ def select_best_bets(horses, win_probs, odds_3min, odds_5min,
                      trio_model=None, trio_config=None, race_data=None,
                      exotic_models=None, exotic_config=None,
                      ev_threshold=1.2, race_budget=1000):
-    """1レースで最適な券種と買い目を選択
+    """1レースで最適な券種と買い目を選択 (v23)
 
     Args:
         horses: [馬番, ...]
@@ -90,20 +90,25 @@ def select_best_bets(horses, win_probs, odds_3min, odds_5min,
         trio_model: トリオ残差LightGBMモデル（Noneなら三連複はSHのみ）
         trio_config: トリオモデル設定
         race_data: 単勝モデルのrace_data（トリオ特徴量構築用）
-        ev_threshold: EV閾値
+        exotic_models: 連系モデル辞書（未使用、互換用）
+        exotic_config: 連系モデル設定（未使用、互換用）
+        ev_threshold: EV閾値（単勝フォールバック用、デフォルト1.2）
         race_budget: 1レースの予算
 
     Returns:
         {
-            'best_type': 'win' | 'umaren' | 'sanrenpuku' | 'sanrentan',
+            'best_type': 'sanrenpuku' | 'sanrentan' | 'win' | 'portfolio' | None,
             'bets': [{'combo', 'ev', 'model_prob', 'est_odds', 'bet_type', 'amount'}, ...],
             'reason': str,
-            'all_candidates': {券種: [ベットリスト]},  # 全券種の候補（ログ用）
+            'all_candidates': {券種: 候補数},
+            'top1_prob': float,
+            'top1_hn': int,
         }
     """
     n = len(horses)
     if n < 5:
-        return {'best_type': None, 'bets': [], 'reason': '頭数不足', 'all_candidates': {}}
+        return {'best_type': None, 'bets': [], 'reason': '頭数不足',
+                'all_candidates': {}, 'top1_prob': 0.0, 'top1_hn': 0}
 
     # SH確率
     umaren_p, umatan_p, trio_p, trifecta_p = sh_all_probs(win_probs)
@@ -116,9 +121,9 @@ def select_best_bets(horses, win_probs, odds_3min, odds_5min,
     # top1の情報
     top1_idx = sorted_idx[0]
     top1_hn = horses[top1_idx]
-    top1_prob = win_probs[top1_idx]  # 1着率
+    top1_prob = win_probs[top1_idx]
 
-    # 馬ごと特徴量辞書（馬連/三連単の残差モデル用）
+    # 馬ごと特徴量辞書（将来の残差モデル用）
     feats_h = {}
     if race_data and 'X' in race_data and 'feature_names' in race_data:
         win_fnames = race_data['feature_names']
@@ -152,69 +157,28 @@ def select_best_bets(horses, win_probs, odds_3min, odds_5min,
     win_cands.sort(key=lambda x: -x['ev'])
     candidates['win'] = win_cands
 
-    # --- 馬連（上位8頭のC(8,2)=28組）---
+    # --- 馬連（上位8頭のC(8,2)=28組）--- 将来用、選択対象外
     um_cands = []
-    # 馬連残差モデルがあれば使用
-    um_model = exotic_models.get('umaren') if exotic_models else None
-    um_info = exotic_config.get('models',{}).get('umaren',{}) if exotic_config else {}
     um_cal = exotic_config.get('odds_calibration',{}).get('umaren',[]) if exotic_config else []
-
-    if um_model and um_info:
-        um_fnames = um_info['feature_names']
-        um_b = um_info['b']; um_tau = um_info['tau']
-        um_X = []; um_init = []; um_meta_local = []; um_est_odds_list = []
-        for a, b in combinations(top8_idx, 2):
-            key = tuple(sorted([a, b]))
-            sh_p = umaren_p.get(key, 0)
-            if sh_p <= 0: continue
+    for a, b in combinations(top8_idx, 2):
+        key = tuple(sorted([a, b]))
+        sh_p = umaren_p.get(key, 0)
+        if sh_p <= 0: continue
+        est_odds = (1/sh_p) * (1-TAKEOUT['umaren'])
+        cal_odds = apply_odds_calibration(est_odds, um_cal)
+        ev = sh_p * cal_odds
+        if ev >= ev_threshold:
             h1, h2 = horses[a], horses[b]
-            pf = {}
-            for k in FEAT_KEYS_PAIR:
-                v1 = feats_h.get(h1,{}).get(k,0); v2 = feats_h.get(h2,{}).get(k,0)
-                pf[f'{k}_sum'] = v1+v2; pf[f'{k}_diff'] = abs(v1-v2)
-            ow1 = feats_h.get(h1,{}).get('win_odds_3min',0); ow2 = feats_h.get(h2,{}).get('win_odds_3min',0)
-            pf['win_odds_ratio'] = min(ow1,ow2)/max(ow1,ow2) if ow1>0 and ow2>0 else 0
-            pf['win_odds_sum_inv'] = (1/ow1+1/ow2) if ow1>0 and ow2>0 else 0
-            um_X.append([pf.get(k,0) for k in um_fnames])
-            um_init.append(math.log(max(sh_p,1e-15))-math.log(max(1-sh_p,1e-15)))
-            um_meta_local.append('-'.join(str(x) for x in sorted([h1,h2])))
-            um_est_odds_list.append((1/sh_p)*(1-TAKEOUT['umaren']))
-        if um_X:
-            um_X = np.array(um_X, dtype=np.float32)
-            um_init = np.array(um_init, dtype=np.float64)
-            um_raw = um_model.predict(um_X, raw_score=True)
-            um_s = um_b * um_init + um_tau * um_raw
-            um_s -= um_s.max()
-            um_probs = np.exp(um_s) / np.exp(um_s).sum()
-            for i in range(len(um_meta_local)):
-                raw_est = um_est_odds_list[i]
-                cal_est = apply_odds_calibration(raw_est, um_cal)
-                ev = um_probs[i] * cal_est
-                if ev >= ev_threshold:
-                    um_cands.append({
-                        'combo': um_meta_local[i], 'ev': float(ev),
-                        'model_prob': float(um_probs[i]), 'est_odds': float(cal_est),
-                        'bet_type': 'umaren',
-                    })
-    else:
-        for a, b in combinations(top8_idx, 2):
-            key = tuple(sorted([a, b]))
-            sh_p = umaren_p.get(key, 0)
-            if sh_p <= 0: continue
-            est_odds = (1/sh_p) * (1-TAKEOUT['umaren'])
-            cal_odds = apply_odds_calibration(est_odds, um_cal)
-            ev = sh_p * cal_odds
-            if ev >= ev_threshold:
-                h1, h2 = horses[a], horses[b]
-                um_cands.append({
-                    'combo': '-'.join(str(x) for x in sorted([h1, h2])),
-                    'ev': float(ev), 'model_prob': float(sh_p),
-                    'est_odds': float(cal_odds), 'bet_type': 'umaren',
-                })
+            um_cands.append({
+                'combo': '-'.join(str(x) for x in sorted([h1, h2])),
+                'ev': float(ev), 'model_prob': float(sh_p),
+                'est_odds': float(cal_odds), 'bet_type': 'umaren',
+            })
     um_cands.sort(key=lambda x: -x['ev'])
     candidates['umaren'] = um_cands
 
-    # --- 三連複（トリオ残差モデル + 補正）---
+    # --- 三連複（トリオ残差モデル or SHのみ、1番人気含む、EV>=1.0）---
+    TRIO_EV_THRESHOLD = 1.0
     trio_cands = []
     tr_model = exotic_models.get('trio') if exotic_models else trio_model
     tr_info = exotic_config.get('models',{}).get('trio',{}) if exotic_config else (trio_config or {})
@@ -225,20 +189,37 @@ def select_best_bets(horses, win_probs, odds_3min, odds_5min,
         tr_cfg = {**exotic_config, **tr_info} if exotic_config else trio_config
         trio_preds = predict_trio(race_data, odds_5min, odds_3min, tr_model, tr_cfg)
         for tp in trio_preds:
+            # 1番人気含むもののみ
+            combo_hns = [int(x) for x in tp['combo'].split('-')]
+            if top1_hn not in combo_hns:
+                continue
             cal_odds = apply_odds_calibration(tp['est_odds'], tr_cal)
             tp['ev'] = tp['model_prob'] * cal_odds
             tp['est_odds'] = cal_odds
-            if tp['ev'] >= ev_threshold:
+            if tp['ev'] >= TRIO_EV_THRESHOLD:
                 trio_cands.append(tp)
     else:
+        # SHのみ: 上位8頭のC(8,3)で1番人気含む
+        # softmax正規化の修正: SH確率は全組の合計が1ではなく、
+        # subsetの合計がSH全体の合計に対する割合になるため、
+        # subsetのsoftmax後に全体のSH合計を掛けて絶対確率に戻す
+        sh_subset_sum = 0.0
+        sh_subset_items = []
         for a, b, c in combinations(top8_idx, 3):
             key = tuple(sorted([a, b, c]))
             sh_p = trio_p.get(key, 0)
             if sh_p <= 0: continue
+            # 1番人気含むもののみ
+            if top1_idx not in (a, b, c):
+                continue
+            sh_subset_sum += sh_p
+            sh_subset_items.append((a, b, c, key, sh_p))
+
+        for a, b, c, key, sh_p in sh_subset_items:
             est_odds = (1/sh_p) * (1-TAKEOUT['sanrenpuku'])
             cal_odds = apply_odds_calibration(est_odds, tr_cal)
             ev = sh_p * cal_odds
-            if ev >= ev_threshold:
+            if ev >= TRIO_EV_THRESHOLD:
                 h1, h2, h3 = horses[a], horses[b], horses[c]
                 trio_cands.append({
                     'combo': '-'.join(str(x) for x in sorted([h1, h2, h3])),
@@ -248,134 +229,109 @@ def select_best_bets(horses, win_probs, odds_3min, odds_5min,
     trio_cands.sort(key=lambda x: -x['ev'])
     candidates['sanrenpuku'] = trio_cands
 
-    # --- 三連単（上位8頭のフル順列、1番人気含む組のみ）---
-    st_cands = []
-    st_model = exotic_models.get('trifecta') if exotic_models else None
-    st_info = exotic_config.get('models',{}).get('trifecta',{}) if exotic_config else {}
-    st_cal = exotic_config.get('odds_calibration',{}).get('sanrentan',[]) if exotic_config else []
+    # === v23 券種選択ロジック ===
+    # 1. トリオ候補をEV順に選択、race_budget内で収まるだけ
+    # 2. 頭数で券種切替: 12頭以上=三連単流し+三連複、12頭未満=三連複のみ
+    # 3. フォールバック: トリオ候補なし → 単勝
 
-    if st_model and st_info:
-        st_fnames = st_info['feature_names']
-        st_b = st_info['b']; st_tau = st_info['tau']
-        st_X = []; st_init = []; st_meta_local = []; st_est_list = []
-        for a_i, b_i, c_i in permutations(top8_idx, 3):
-            # 1番人気含む組のみ
-            if top1_idx not in (a_i, b_i, c_i):
-                continue
-            key = (a_i, b_i, c_i)
-            sh_p = trifecta_p.get(key, 0)
-            if sh_p <= 0: continue
-            h1, h2, h3 = horses[a_i], horses[b_i], horses[c_i]
-            pf = {}
-            f1 = feats_h.get(h1,{}); f2 = feats_h.get(h2,{}); f3 = feats_h.get(h3,{})
-            for k in FEAT_KEYS_PAIR:
-                v1=f1.get(k,0); v2=f2.get(k,0); v3=f3.get(k,0)
-                pf[f'{k}_sum']=v1+v2+v3; pf[f'{k}_spread']=max(v1,v2,v3)-min(v1,v2,v3)
-            pf['first_odds']=f1.get('win_odds_3min',0)
-            pf['second_odds']=f2.get('win_odds_3min',0)
-            pf['third_odds']=f3.get('win_odds_3min',0)
-            st_X.append([pf.get(k,0) for k in st_fnames])
-            st_init.append(math.log(max(sh_p,1e-15))-math.log(max(1-sh_p,1e-15)))
-            st_meta_local.append(f'{h1}-{h2}-{h3}')
-            st_est_list.append((1/sh_p)*(1-TAKEOUT['sanrentan']))
-        if st_X:
-            st_X = np.array(st_X, dtype=np.float32)
-            st_init = np.array(st_init, dtype=np.float64)
-            st_raw = st_model.predict(st_X, raw_score=True)
-            st_s = st_b * st_init + st_tau * st_raw
-            st_s -= st_s.max()
-            st_probs = np.exp(st_s) / np.exp(st_s).sum()
-            for i in range(len(st_meta_local)):
-                raw_est = st_est_list[i]
-                cal_est = apply_odds_calibration(raw_est, st_cal)
-                ev = st_probs[i] * cal_est
-                if ev >= ev_threshold:
-                    st_cands.append({
-                        'combo': st_meta_local[i], 'ev': float(ev),
-                        'model_prob': float(st_probs[i]), 'est_odds': float(cal_est),
-                        'bet_type': 'sanrentan',
-                    })
-    else:
-        # モデルなし: SH確率のみ（1番人気含む全順列）
-        for a_i, b_i, c_i in permutations(top8_idx, 3):
-            if top1_idx not in (a_i, b_i, c_i):
-                continue
-            key = (a_i, b_i, c_i)
-            sh_p = trifecta_p.get(key, 0)
-            if sh_p <= 0: continue
-            est_odds = (1/sh_p) * (1-TAKEOUT['sanrentan'])
-            cal_odds = apply_odds_calibration(est_odds, st_cal)
-            ev = sh_p * cal_odds
-            if ev >= ev_threshold:
-                h1, h2, h3 = horses[a_i], horses[b_i], horses[c_i]
-                st_cands.append({
-                    'combo': f'{h1}-{h2}-{h3}',
-                    'ev': float(ev), 'model_prob': float(sh_p),
-                    'est_odds': float(cal_odds), 'bet_type': 'sanrentan',
-                })
-    st_cands.sort(key=lambda x: -x['ev'])
-    candidates['sanrentan'] = st_cands
-
-    # --- 馬単（1着固定、top1確率>=30%のとき）---
-    ut_cands = []
-    if top1_prob >= 0.30:
-        for p_i in top8_idx:
-            if p_i == top1_idx: continue
-            key = (top1_idx, p_i)
-            sh_p = umatan_p.get(key, 0)
-            if sh_p <= 0: continue
-            est_odds = (1/sh_p) * (1-TAKEOUT['umatan'])
-            ev = sh_p * est_odds
-            if ev >= ev_threshold:
-                ut_cands.append({
-                    'combo': f'{top1_hn}-{horses[p_i]}',
-                    'ev': float(ev), 'model_prob': float(sh_p),
-                    'est_odds': float(est_odds), 'bet_type': 'umatan',
-                })
-    ut_cands.sort(key=lambda x: -x['ev'])
-    candidates['umatan'] = ut_cands
-
-    # === 券種選択ロジック ===
-    # ポートフォリオ戦略: 三連複+三連単の同時購入（ROI 130.0%, 利益5.7倍）
-    # フォールバック: どちらかのみ → 単勝
     best_type = None
     best_bets = []
     best_reason = 'EV>=閾値の組合せなし'
 
-    trio_c = candidates.get('sanrenpuku', [])
-    trifecta_c = candidates.get('sanrentan', [])
-    win_c = candidates.get('win', [])
+    # 馬番→インデックスの逆引き
+    hn_to_idx = {h: i for i, h in enumerate(horses)}
 
-    # 優先度1: 三連複+三連単の同時購入
-    if trio_c or trifecta_c:
-        combined = []
-        for c in trio_c:
-            combined.append(c)
-        for c in trifecta_c:
-            combined.append(c)
+    if trio_cands:
+        # 頭数による1トリオあたりのコスト
+        cost_per_trio = 500 if n >= 12 else 100  # 5点 or 1点
 
-        if combined:
-            n_bets = len(combined)
-            per_bet = max(100, (race_budget // n_bets // 100) * 100)
-            for b in combined:
-                b['amount'] = per_bet
+        # EV順にrace_budget内で選択
+        selected_trios = []
+        remaining_budget = race_budget
+        for tc in trio_cands:
+            if remaining_budget < cost_per_trio:
+                break
+            selected_trios.append(tc)
+            remaining_budget -= cost_per_trio
 
-            # 券種を'portfolio'として返す（三連複+三連単の混合）
-            best_type = 'portfolio'
-            best_bets = combined
-            n_trio = len(trio_c)
-            n_tri = len(trifecta_c)
-            avg_ev = np.mean([c['ev'] for c in combined])
-            expected_profit = sum(c['ev'] * per_bet for c in combined) - n_bets * per_bet
-            best_reason = (f'三連複{n_trio}点+三連単{n_tri}点={n_bets}点 '
-                          f'期待利益={expected_profit:.0f}円 '
-                          f'avg_EV={avg_ev:.2f} '
-                          f'top1確率={top1_prob:.1%}')
+        if selected_trios:
+            bets = []
+            for tc in selected_trios:
+                combo_hns = [int(x) for x in tc['combo'].split('-')]
+                # 3頭の勝率でソート: ◎=最高、○=2番目、▲=3番目
+                trio_with_prob = []
+                for hn in combo_hns:
+                    idx = hn_to_idx.get(hn)
+                    wp = win_probs[idx] if idx is not None else 0.0
+                    trio_with_prob.append((hn, wp))
+                trio_with_prob.sort(key=lambda x: -x[1])
+                honmei_hn = trio_with_prob[0][0]   # ◎
+                taikou_hn = trio_with_prob[1][0]   # ○
+                anaume_hn = trio_with_prob[2][0]    # ▲
 
-    # フォールバック: 単勝のみ（連系が0のとき）
-    if not best_bets and win_c:
+                if n >= 12:
+                    # 三連単 1-2着流し: ◎or○が1着、残りが2着、▲が3着
+                    # 4 permutations
+                    sanrentan_combos = [
+                        (honmei_hn, taikou_hn, anaume_hn),  # ◎→○→▲
+                        (honmei_hn, anaume_hn, taikou_hn),  # ◎→▲→○
+                        (taikou_hn, honmei_hn, anaume_hn),  # ○→◎→▲
+                        (taikou_hn, anaume_hn, honmei_hn),  # ○→▲→◎
+                    ]
+                    for first, second, third in sanrentan_combos:
+                        # 三連単の確率とオッズを推定
+                        i1 = hn_to_idx.get(first)
+                        i2 = hn_to_idx.get(second)
+                        i3 = hn_to_idx.get(third)
+                        st_key = (i1, i2, i3) if i1 is not None and i2 is not None and i3 is not None else None
+                        st_prob = trifecta_p.get(st_key, 0) if st_key else 0
+                        st_est_odds = (1/st_prob) * (1-TAKEOUT['sanrentan']) if st_prob > 0 else 0
+                        bets.append({
+                            'combo': f'{first}-{second}-{third}',
+                            'ev': float(st_prob * st_est_odds) if st_prob > 0 else 0.0,
+                            'model_prob': float(st_prob),
+                            'est_odds': float(st_est_odds),
+                            'bet_type': 'sanrentan',
+                            'amount': 100,
+                            'trio_origin': tc['combo'],
+                        })
+
+                    # 三連複 保険1点
+                    bets.append({
+                        'combo': tc['combo'],
+                        'ev': float(tc['ev']),
+                        'model_prob': float(tc['model_prob']),
+                        'est_odds': float(tc['est_odds']),
+                        'bet_type': 'sanrenpuku',
+                        'amount': 100,
+                        'trio_origin': tc['combo'],
+                    })
+                else:
+                    # 12頭未満: 三連複のみ
+                    bets.append({
+                        'combo': tc['combo'],
+                        'ev': float(tc['ev']),
+                        'model_prob': float(tc['model_prob']),
+                        'est_odds': float(tc['est_odds']),
+                        'bet_type': 'sanrenpuku',
+                        'amount': 100,
+                        'trio_origin': tc['combo'],
+                    })
+
+            best_type = 'portfolio' if n >= 12 else 'sanrenpuku'
+            best_bets = bets
+            total_cost = sum(b['amount'] for b in bets)
+            n_trios = len(selected_trios)
+            avg_ev = np.mean([tc['ev'] for tc in selected_trios])
+            best_reason = (f'{n_trios}トリオ '
+                          f'{"三連単+三連複" if n >= 12 else "三連複のみ"} '
+                          f'{len(bets)}点 {total_cost}円 '
+                          f'avg_EV={avg_ev:.2f} nhead={n}')
+
+    # フォールバック: トリオ候補なし → 単勝
+    if not best_bets and win_cands:
         best_type = 'win'
-        best_bets = win_c
+        best_bets = win_cands
         n_bets = len(best_bets)
         per_bet = max(100, (race_budget // n_bets // 100) * 100)
         for b in best_bets:
@@ -398,8 +354,7 @@ def select_best_bets(horses, win_probs, odds_3min, odds_5min,
 BET_TYPE_JP = {
     'win': '単勝',
     'umaren': '馬連',
-    'umatan': '馬単',
     'sanrenpuku': '三連複',
     'sanrentan': '三連単',
-    'portfolio': '三連複+三連単',
+    'portfolio': '三連単+三連複',
 }
