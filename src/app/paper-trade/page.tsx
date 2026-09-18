@@ -71,6 +71,7 @@ function StatCard({ label, value, sub, color }: { label: string; value: string; 
 export default function PaperTradePage() {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [amount, setAmount] = useState(10000);
+  const [modelVersion, setModelVersion] = useState<"v25" | "v27">("v27");
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -94,7 +95,7 @@ export default function PaperTradePage() {
       const res = await fetch("/api/jrdb/paper-trade/m7", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date, amount }),
+        body: JSON.stringify({ date, amount, version: modelVersion }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -139,7 +140,7 @@ export default function PaperTradePage() {
       <div className="flex items-center gap-2">
         <FileCheck className="h-6 w-6" />
         <h2 className="text-2xl font-bold">ペーパートレード</h2>
-        <Badge variant="outline" className="text-xs">M7 v25</Badge>
+        <Badge variant="outline" className="text-xs">M7 {modelVersion}</Badge>
       </div>
 
       {/* Actions */}
@@ -151,6 +152,20 @@ export default function PaperTradePage() {
             onChange={e => setDate(e.target.value)}
             className="rounded border px-3 py-2 text-sm"
           />
+          <div className="flex items-center gap-1">
+            {(["v27", "v25"] as const).map(v => (
+              <button
+                key={v}
+                onClick={() => setModelVersion(v)}
+                className={cn(
+                  "rounded px-2 py-1.5 text-xs border transition-colors",
+                  modelVersion === v ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                )}
+              >
+                {v === "v27" ? "v27 (適性除外)" : "v25 (旧Full)"}
+              </button>
+            ))}
+          </div>
           <div className="flex items-center gap-1">
             {[1000, 5000, 10000, 30000, 50000].map(v => (
               <button
@@ -424,7 +439,13 @@ export default function PaperTradePage() {
                   try { scoreInfo = trade.ai_score_json ? JSON.parse(trade.ai_score_json) : null; } catch {}
                   return (
                     <tr key={trade.id} className="border-b">
-                      <td className="px-2 py-1 font-mono text-muted-foreground">{trade.race_date}</td>
+                      <td className="px-2 py-1 font-mono text-muted-foreground">
+                        <div>{trade.race_date}</div>
+                        <span className={cn("rounded px-1 py-0.5 text-[9px] font-medium",
+                          scoreInfo?.version === "v27" ? "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300" :
+                          "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+                        )}>{scoreInfo?.version ?? "v25"}</span>
+                      </td>
                       <td className="px-2 py-1">
                         {trade.venue_name ? (
                           <div className="flex items-center gap-1 flex-wrap">

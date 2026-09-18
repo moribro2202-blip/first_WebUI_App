@@ -32,6 +32,14 @@ def get_odds(race_id, bet_type, combination):
                      (race_id, bet_type, combination)).fetchone()
     return row[0] if row and row[0] > 0 else 0
 
+def get_odds_hjc(race_id, bet_type, combination):
+    """確定オッズを取得。HJC無い場合はOTフォールバック"""
+    hjc_bt = bet_type + '_hjc'
+    row = db.execute("SELECT odds FROM odds WHERE race_id=? AND bet_type=? AND combination=?",
+                     (race_id, hjc_bt, combination)).fetchone()
+    if row and row[0] > 0: return row[0]
+    return get_odds(race_id, bet_type, combination)
+
 TY = [2021,2022,2023,2024,2025,2026]; B = 10000
 
 def softmax(sc, scale):
@@ -184,7 +192,8 @@ def simulate_bets(filter_pb=None):
             hit = check_hit(rdata)
             yearly[year]['b'] += B; yearly[year]['c'] += 1
             if hit:
-                yearly[year]['r'] += int(B * odds_val)
+                odds_confirmed = get_odds_hjc(rid, bet_type, combo)
+                yearly[year]['r'] += int(B * odds_confirmed)
                 yearly[year]['h'] += 1
 
         tb = sum(v['b'] for v in yearly.values())

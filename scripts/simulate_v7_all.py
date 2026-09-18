@@ -1,6 +1,7 @@
 """
-v7改: 全券種・全戦略の補正なしシミュレーション
-条件: リアルタイム再現、ウォークフォワード、SM不使用、補正なし
+v7改: 全券種・全戦略シミュレーション（確定オッズベース）
+条件: リアルタイム再現、ウォークフォワード、SM不使用
+払戻計算: HJC確定オッズ使用（予想オッズは馬券選択のみに使用）
 """
 import sqlite3, math, sys
 from collections import defaultdict
@@ -137,12 +138,17 @@ for sname, sfn in strategies.items():
         month=rd[:7]; rb=0;rr=0
         for bt,parts,amt in bets:
             combo='-'.join(str(x) for x in parts)
+            # 予想オッズで馬券存在チェック（賭ける判断は予想オッズベース）
             orow=db.execute("SELECT odds FROM odds WHERE race_id=? AND bet_type=? AND combination=?",(rid,bt,combo)).fetchone()
             if not orow or orow[0]<=0: continue
-            odds=orow[0]  # 補正なし
             hit=check_hit(bt,parts,t3)
             rb+=amt; tbets+=1; bt_stats[bt]['c']+=1; bt_stats[bt]['b']+=amt
-            if hit: rr+=amt*odds; thits+=1; bt_stats[bt]['h']+=1; bt_stats[bt]['r']+=amt*odds
+            if hit:
+                # 確定オッズで払戻計算（HJC）
+                hjc_bt=bt+'_hjc'
+                hjc_row=db.execute("SELECT odds FROM odds WHERE race_id=? AND bet_type=? AND combination=?",(rid,hjc_bt,combo)).fetchone()
+                odds=hjc_row[0] if hjc_row else orow[0]  # HJC無い場合はOTフォールバック
+                rr+=amt*odds; thits+=1; bt_stats[bt]['h']+=1; bt_stats[bt]['r']+=amt*odds
         if rb==0: continue
         tb+=rb;tr+=rr;traces+=1
         mo[month]['b']+=rb;mo[month]['r']+=rr;mo[month]['n']+=1
@@ -156,7 +162,7 @@ for sname, sfn in strategies.items():
     })
 
 p('='*120)
-p('=== v7改: 全券種・全戦略シミュレーション（補正なし・リーク排除・alpha=0.15） ===')
+p('=== v7改: 全券種・全戦略シミュレーション（確定オッズ・リーク排除・alpha=0.15） ===')
 p('='*120)
 p(f'{"#":>3} {"戦略":<25} {"R数":>5} {"点数":>6} {"的中":>5} {"的中率":>6} {"投資":>14} {"払戻":>14} {"収支":>14} {"回収率":>7}')
 p('-'*110)

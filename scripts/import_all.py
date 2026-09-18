@@ -161,7 +161,7 @@ for fpath in sorted(glob.glob(os.path.join(JRDB, 'OZ', '*.txt'))):
 db.commit()
 print(f"  OZ: {oz_count} win odds", flush=True)
 
-# --- OT (trio odds) ---
+# --- OT (trio odds) - C(18,3)=816 fixed slots per race ---
 ot_count = 0
 for fpath in sorted(glob.glob(os.path.join(JRDB, 'OT', '*.txt'))):
     with open(fpath, 'rb') as f:
@@ -174,14 +174,15 @@ for fpath in sorted(glob.glob(os.path.join(JRDB, 'OT', '*.txt'))):
             rid=f'{y}{v}{k}{rn}'
             try: heads=int(line[8:10].decode('ascii','replace').strip())
             except: continue
-            idx=0
-            for i in range(1,heads+1):
-                for j in range(i+1,heads+1):
-                    for kk in range(j+1,heads+1):
-                        pos=10+idx*6
-                        if pos+6 > len(line): break
+            slot_idx=0
+            for i in range(1,19):
+                for j in range(i+1,19):
+                    for kk in range(j+1,19):
+                        pos=10+slot_idx*6
+                        slot_idx += 1
+                        if pos+6 > len(line): continue
+                        if i > heads or j > heads or kk > heads: continue
                         s=line[pos:pos+6].decode('ascii','replace').strip()
-                        idx += 1
                         try:
                             o=float(s)
                             if o > 0 and o < 9999:
@@ -241,6 +242,129 @@ for fpath in sorted(glob.glob(os.path.join(JRDB, 'SED', 'SED*.txt'))):
             sed_count += 1
 db.commit()
 print(f"  SED: {sed_count} results", flush=True)
+
+# --- HJC (confirmed payouts for all bet types) ---
+# HJC format (0-indexed byte positions):
+#   Header:      0-7   (8 bytes)
+#   Tansho:      8-34  (3 x 9:  uma2+pay7, /100)
+#   Fukusho:    35-79  (5 x 9:  uma2+pay7, /100)
+#   Wakuren:    80-106 (3 x 9:  combo2+pay7, /100)
+#   Umaren:    107-142 (3 x 12: combo4+pay8, /100)
+#   Wide:      143-226 (7 x 12: combo4+pay8, /100)
+#   Umatan:    227-298 (6 x 12: combo4+pay8, /100)
+#   Sanrenpuku: 299-340 (3 x 14: combo6+pay8, /100)
+#   Sanrentan:  341-430 (6 x 15: combo6+pay9, /100)
+hjc_counts = defaultdict(int)
+for fpath in sorted(glob.glob(os.path.join(JRDB, 'HJC', '*.txt'))):
+    with open(fpath, 'rb') as f:
+        for line in f.readlines():
+            if len(line) < 430: continue
+            v=line[0:2].decode('ascii','replace').strip()
+            y=line[2:4].decode('ascii','replace').strip()
+            k=line[4:6].decode('ascii','replace').strip()
+            rn=line[6:8].decode('ascii','replace').strip()
+            rid=f'{y}{v}{k}{rn}'
+
+            def rd(pos, length):
+                return line[pos:pos+length].decode('ascii','replace').strip()
+
+            # Tansho (win): 3 entries x 9 bytes at pos 8
+            for i in range(3):
+                base = 8 + i*9
+                uma = rd(base, 2); pay = rd(base+2, 7)
+                try:
+                    uma_i = int(uma); pay_i = int(pay)
+                    if uma_i <= 0 or pay_i <= 0: continue
+                    db.execute('INSERT OR REPLACE INTO odds (race_id,bet_type,combination,odds) VALUES (?,?,?,?)',
+                        (rid, 'win_hjc', str(uma_i), pay_i/100))
+                    hjc_counts['win'] += 1
+                except: pass
+
+            # Fukusho (place): 5 entries x 9 bytes at pos 35
+            for i in range(5):
+                base = 35 + i*9
+                uma = rd(base, 2); pay = rd(base+2, 7)
+                try:
+                    uma_i = int(uma); pay_i = int(pay)
+                    if uma_i <= 0 or pay_i <= 0: continue
+                    db.execute('INSERT OR REPLACE INTO odds (race_id,bet_type,combination,odds) VALUES (?,?,?,?)',
+                        (rid, 'place_hjc', str(uma_i), pay_i/100))
+                    hjc_counts['place'] += 1
+                except: pass
+
+            # Umaren: 3 entries x 12 bytes at pos 107
+            for i in range(3):
+                base = 107 + i*12
+                combo_raw = rd(base, 4); pay = rd(base+4, 8)
+                try:
+                    h1 = int(combo_raw[:2]); h2 = int(combo_raw[2:])
+                    pay_i = int(pay)
+                    if h1 <= 0 or pay_i <= 0: continue
+                    combo = '-'.join(str(x) for x in sorted([h1, h2]))
+                    db.execute('INSERT OR REPLACE INTO odds (race_id,bet_type,combination,odds) VALUES (?,?,?,?)',
+                        (rid, 'umaren_hjc', combo, pay_i/100))
+                    hjc_counts['umaren'] += 1
+                except: pass
+
+            # Wide: 7 entries x 12 bytes at pos 143
+            for i in range(7):
+                base = 143 + i*12
+                combo_raw = rd(base, 4); pay = rd(base+4, 8)
+                try:
+                    h1 = int(combo_raw[:2]); h2 = int(combo_raw[2:])
+                    pay_i = int(pay)
+                    if h1 <= 0 or pay_i <= 0: continue
+                    combo = '-'.join(str(x) for x in sorted([h1, h2]))
+                    db.execute('INSERT OR REPLACE INTO odds (race_id,bet_type,combination,odds) VALUES (?,?,?,?)',
+                        (rid, 'wide_hjc', combo, pay_i/100))
+                    hjc_counts['wide'] += 1
+                except: pass
+
+            # Umatan: 6 entries x 12 bytes at pos 227
+            for i in range(6):
+                base = 227 + i*12
+                combo_raw = rd(base, 4); pay = rd(base+4, 8)
+                try:
+                    h1 = int(combo_raw[:2]); h2 = int(combo_raw[2:])
+                    pay_i = int(pay)
+                    if h1 <= 0 or pay_i <= 0: continue
+                    combo = f'{h1}-{h2}'
+                    db.execute('INSERT OR REPLACE INTO odds (race_id,bet_type,combination,odds) VALUES (?,?,?,?)',
+                        (rid, 'umatan_hjc', combo, pay_i/100))
+                    hjc_counts['umatan'] += 1
+                except: pass
+
+            # Sanrenpuku: 3 entries x 14 bytes at pos 299
+            for i in range(3):
+                base = 299 + i*14
+                combo_raw = rd(base, 6); pay = rd(base+6, 8)
+                try:
+                    h1 = int(combo_raw[:2]); h2 = int(combo_raw[2:4]); h3 = int(combo_raw[4:])
+                    pay_i = int(pay)
+                    if h1 <= 0 or pay_i <= 0: continue
+                    combo = '-'.join(str(x) for x in sorted([h1, h2, h3]))
+                    db.execute('INSERT OR REPLACE INTO odds (race_id,bet_type,combination,odds) VALUES (?,?,?,?)',
+                        (rid, 'sanrenpuku_hjc', combo, pay_i/100))
+                    hjc_counts['sanrenpuku'] += 1
+                except: pass
+
+            # Sanrentan: 6 entries x 15 bytes at pos 341
+            for i in range(6):
+                base = 341 + i*15
+                combo_raw = rd(base, 6); pay = rd(base+6, 9)
+                try:
+                    h1 = int(combo_raw[:2]); h2 = int(combo_raw[2:4]); h3 = int(combo_raw[4:])
+                    pay_i = int(pay)
+                    if h1 <= 0 or pay_i <= 0: continue
+                    combo = f'{h1}-{h2}-{h3}'
+                    db.execute('INSERT OR REPLACE INTO odds (race_id,bet_type,combination,odds) VALUES (?,?,?,?)',
+                        (rid, 'sanrentan_hjc', combo, pay_i/100))
+                    hjc_counts['sanrentan'] += 1
+                except: pass
+
+db.commit()
+hjc_total = sum(hjc_counts.values())
+print(f"  HJC: {hjc_total} confirmed payouts ({', '.join(f'{k}:{v}' for k,v in sorted(hjc_counts.items()))})", flush=True)
 
 # === Step 3: Summary ===
 print("\n=== Summary ===", flush=True)

@@ -116,7 +116,10 @@ for ri,(race_id,race_date) in enumerate(races):
             if ev>=EV_TH:
                 ky=max(0,(qF*co-1)/(co-1))/4
                 hit=check_hit(bt,parts,top3_hn[:3])
-                all_ev_bets.append({'bt':bt,'combo':cs,'ev':ev,'kelly':ky,'odds':co,'hit':hit,'parts':parts})
+                # 確定オッズで払戻計算
+                hjc_row=db.execute("SELECT odds FROM odds WHERE race_id=? AND bet_type=? AND combination=?",(race_id,bt+'_hjc',cs)).fetchone()
+                odds_confirmed=hjc_row[0] if hjc_row and hjc_row[0]>0 else co
+                all_ev_bets.append({'bt':bt,'combo':cs,'ev':ev,'kelly':ky,'odds':odds_confirmed,'hit':hit,'parts':parts})
 
     if not all_ev_bets: continue
 

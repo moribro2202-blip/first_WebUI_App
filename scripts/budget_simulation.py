@@ -24,6 +24,8 @@ race_cond = {}
 for row in db.execute('SELECT race_id,track_condition FROM races').fetchall(): race_cond[row[0]] = row[1]
 trio_cache = defaultdict(dict)
 for rid,combo,odds in db.execute("SELECT race_id,combination,odds FROM odds WHERE bet_type='sanrenpuku'").fetchall(): trio_cache[rid][combo] = odds
+trio_hjc = defaultdict(dict)
+for rid,combo,odds in db.execute("SELECT race_id,combination,odds FROM odds WHERE bet_type='sanrenpuku_hjc' AND odds>0").fetchall(): trio_hjc[rid][combo] = odds
 win_odds_cache = {}
 for rid,_,_,_,_ in races_raw:
     oz = db.execute("SELECT combination,odds FROM odds WHERE race_id=? AND bet_type='win'",(rid,)).fetchall()
@@ -126,7 +128,8 @@ for ty in TY:
         pb=(1/tp_b)*0.75 if tp_b>0 else 9999
         if pb>pred_max: continue
         hit=frozenset(top)==frozenset(t3[:3])
-        all_bets.append((rd, rid, hit, mo, tp_b, pb))
+        odds_hjc=trio_hjc.get(rid,{}).get(combo,mo)
+        all_bets.append((rd, rid, hit, odds_hjc, tp_b, pb))
 
 all_bets.sort(key=lambda x: (x[0], x[1]))
 print(f"  Total bets: {len(all_bets)}", flush=True)

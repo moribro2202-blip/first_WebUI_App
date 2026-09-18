@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/jrdb/db";
 import { predictDate } from "@/lib/m7-engine";
+import type { M7Version } from "@/lib/m7-engine";
 
 /**
  * M7ペーパートレードAPI
@@ -10,20 +11,21 @@ import { predictDate } from "@/lib/m7-engine";
 
 export async function POST(request: NextRequest) {
   try {
-    const { date, amount = 10000 } = await request.json();
+    const { date, amount = 10000, version = "v27" } = await request.json();
     if (!date) return NextResponse.json({ error: "date required" }, { status: 400 });
+    const modelVersion = (version === "v25" ? "v25" : "v27") as M7Version;
     const betAmount = Math.max(100, Math.floor(Number(amount)));
 
     const db = getDb();
-    const predictions = predictDate(date);
+    const predictions = predictDate(date, modelVersion);
     const bets = predictions.filter(p => p.shouldBet);
 
-    // Check if already recorded
+    // Check if already recorded for this version
     const existing = db.prepare(
-      "SELECT COUNT(*) as cnt FROM paper_trades WHERE race_date = ? AND bet_type = 'sanrenpuku' AND ai_score_json LIKE '%M7%'"
-    ).get(date) as { cnt: number };
+      "SELECT COUNT(*) as cnt FROM paper_trades WHERE race_date = ? AND bet_type = 'sanrenpuku' AND ai_score_json LIKE ?"
+    ).get(date, `%"version":"${modelVersion}"%`) as { cnt: number };
     if (existing.cnt > 0) {
-      return NextResponse.json({ error: "この日は既に記録済みです", existing: existing.cnt }, { status: 409 });
+      return NextResponse.json({ error: `この日は${modelVersion}で既に記録済みです`, existing: existing.cnt }, { status: 409 });
     }
 
     const stmt = db.prepare(`
@@ -41,7 +43,7 @@ export async function POST(request: NextRequest) {
 
       const scoreJson = JSON.stringify({
         model: "M7",
-        version: "v25",
+        version: modelVersion,
         predBlend: pred.predBlend,
         trioProb: pred.trioProb,
         top3Scores: pred.horses.slice(0, 3).map(h => ({
@@ -109,7 +111,22 @@ export async function PUT(request: NextRequest) {
 
       const actualTop3 = results.map(r => r.horse_number).sort((a, b) => a - b).join("-");
       const hit = trade.combination === actualTop3;
-      const payout = hit && trade.odds ? trade.amount * trade.odds : 0;
+
+      // Use HJC confirmed odds if available, fall back to OT odds
+      let finalOdds = trade.odds;
+      if (hit) {
+        const hjcRow = db.prepare(
+          "SELECT odds FROM odds WHERE race_id = ? AND bet_type = 'sanrenpuku_hjc' AND combination = ?"
+        ).get(trade.race_id, trade.combination) as { odds: number } | undefined;
+        if (hjcRow) finalOdds = hjcRow.odds;
+      }
+
+      const payout = hit && finalOdds ? trade.amount * finalOdds : 0;
+
+      // Update odds to confirmed value if changed
+      if (hit && finalOdds !== trade.odds) {
+        db.prepare("UPDATE paper_trades SET odds = ? WHERE id = ?").run(finalOdds, trade.id);
+      }
 
       update.run(hit ? "hit" : "miss", payout, trade.id);
       settled++;
@@ -118,8 +135,8 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({
       date, settled, hits, totalPayout,
-      invested: settled * 10000,
-      rr: settled > 0 ? ((totalPayout / (settled * 10000)) * 100).toFixed(1) + "%" : "N/A",
+      invested: pending.slice(0, settled).reduce((s, t) => s + t.amount, 0),
+      rr: settled > 0 ? ((totalPayout / pending.slice(0, settled).reduce((s, t) => s + t.amount, 0)) * 100).toFixed(1) + "%" : "N/A",
     });
   } catch (error) {
     return NextResponse.json(
@@ -131,13 +148,14 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const { date } = await request.json();
+    const { date, version } = await request.json();
     if (!date) return NextResponse.json({ error: "date required" }, { status: 400 });
 
     const db = getDb();
+    const likePattern = version ? `%"version":"${version}"%` : '%M7%';
     const result = db.prepare(
-      "DELETE FROM paper_trades WHERE race_date = ? AND ai_score_json LIKE '%M7%'"
-    ).run(date);
+      "DELETE FROM paper_trades WHERE race_date = ? AND ai_score_json LIKE ?"
+    ).run(date, likePattern);
 
     return NextResponse.json({ date, deleted: result.changes });
   } catch (error) {

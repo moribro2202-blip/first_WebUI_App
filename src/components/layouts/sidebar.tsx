@@ -2,17 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, BrainCircuit, Target, FileCheck, Activity, History, Settings, X } from "lucide-react";
+import { LayoutDashboard, Activity, History, Settings, X, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 const navItems = [
   { href: "/", label: "ダッシュボード", icon: LayoutDashboard },
-  { href: "/m7", label: "M7 予測", icon: Target },
-  { href: "/paper-trade", label: "ペーパートレード", icon: FileCheck },
+  { href: "/realtime", label: "自動投票", icon: Zap },
   { href: "/monitor", label: "モデル監視", icon: Activity },
-  { href: "/predict", label: "レース予想", icon: BrainCircuit },
-  { href: "/history", label: "予想履歴", icon: History },
+  { href: "/history", label: "履歴", icon: History },
   { href: "/settings", label: "設定", icon: Settings },
 ];
 

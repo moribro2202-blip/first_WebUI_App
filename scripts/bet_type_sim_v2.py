@@ -134,14 +134,18 @@ def sim(filter_pb=None):
                     if not o or o[0]<=0 or o[0]>500: continue
                     yrs[rd['year']]['b']+=B
                     if hit_fn(rd,c):
-                        yrs[rd['year']]['r']+=int(B*o[0])
+                        hjc=db.execute("SELECT odds FROM odds WHERE race_id=? AND bet_type=? AND combination=?",(rid,bet_type_db+'_hjc',c)).fetchone()
+                        odds_c=hjc[0] if hjc and hjc[0]>0 else o[0]
+                        yrs[rd['year']]['r']+=int(B*odds_c)
                         yrs[rd['year']]['h']+=1
             else:
                 o=db.execute("SELECT odds FROM odds WHERE race_id=? AND bet_type=? AND combination=?",(rid,bet_type_db,combo)).fetchone()
                 if not o or o[0]<=0 or o[0]>500: continue
                 yrs[rd['year']]['b']+=B
                 if hit_fn(rd,combo):
-                    yrs[rd['year']]['r']+=int(B*o[0])
+                    hjc=db.execute("SELECT odds FROM odds WHERE race_id=? AND bet_type=? AND combination=?",(rid,bet_type_db+'_hjc',combo)).fetchone()
+                    odds_c=hjc[0] if hjc and hjc[0]>0 else o[0]
+                    yrs[rd['year']]['r']+=int(B*odds_c)
                     yrs[rd['year']]['h']+=1
         tb=sum(v['b'] for v in yrs.values()); tr=sum(v['r'] for v in yrs.values())
         hits=sum(v['h'] for v in yrs.values()); rc=tb//B

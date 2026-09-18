@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Database, Upload, Loader2, CheckCircle, AlertTriangle } from "lucide-react";
+import { Database, Upload, Loader2, CheckCircle, AlertTriangle, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type DbStats = {
@@ -23,8 +23,10 @@ export function JrdbImportForm() {
   const [stats, setStats] = useState<DbStats | null>(null);
   const [importing, setImporting] = useState(false);
   const [extendedImporting, setExtendedImporting] = useState(false);
+  const [autoImporting, setAutoImporting] = useState(false);
   const [importResults, setImportResults] = useState<ImportResultItem[]>([]);
   const [extendedResult, setExtendedResult] = useState<string | null>(null);
+  const [autoResult, setAutoResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -68,8 +70,44 @@ export function JrdbImportForm() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-4">
-        <Button onClick={handleImport} disabled={importing || extendedImporting}>
+      <div className="flex flex-wrap items-center gap-4">
+        <Button
+          onClick={async () => {
+            setAutoImporting(true);
+            setError(null);
+            setAutoResult(null);
+            try {
+              const res = await fetch("/api/jrdb/import/auto", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({}),
+              });
+              const data = await res.json();
+              if (!res.ok) { setError(data.error); return; }
+              const lines = (data.results as Array<{
+                raceDate: string;
+                alreadyExists: boolean;
+                imported: Record<string, number>;
+              }>).map((r) =>
+                r.alreadyExists
+                  ? `${r.raceDate}: 既にインポート済み`
+                  : `${r.raceDate}: ${r.imported.races}R / ${r.imported.entries}頭 / オッズ${r.imported.odds}件`
+              );
+              setAutoResult(lines.join(" | "));
+              fetchStats();
+            } catch { setError("自動インポートに失敗しました"); }
+            finally { setAutoImporting(false); }
+          }}
+          disabled={importing || extendedImporting || autoImporting}
+        >
+          {autoImporting ? (
+            <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+          ) : (
+            <Download className="mr-1 h-4 w-4" />
+          )}
+          {autoImporting ? "ダウンロード中..." : "JRDB自動取得"}
+        </Button>
+        <Button onClick={handleImport} disabled={importing || extendedImporting || autoImporting}>
           {importing ? (
             <Loader2 className="mr-1 h-4 w-4 animate-spin" />
           ) : (
@@ -91,7 +129,7 @@ export function JrdbImportForm() {
             } catch { setError("拡張インポートに失敗"); }
             finally { setExtendedImporting(false); }
           }}
-          disabled={importing || extendedImporting}
+          disabled={importing || extendedImporting || autoImporting}
           variant="outline"
         >
           {extendedImporting ? (
@@ -126,6 +164,13 @@ export function JrdbImportForm() {
           <p>data/jrdb/UKC/ ... 馬基本データ</p>
         </div>
       </div>
+
+      {autoResult && (
+        <div className="flex items-center gap-2 rounded-md bg-green-50 dark:bg-green-950 p-3 text-sm text-green-700 dark:text-green-300">
+          <CheckCircle className="h-4 w-4 flex-shrink-0" />
+          <span>{autoResult}</span>
+        </div>
+      )}
 
       {extendedResult && (
         <div className="flex items-center gap-2 rounded-md bg-green-50 dark:bg-green-950 p-3 text-sm text-green-700 dark:text-green-300">

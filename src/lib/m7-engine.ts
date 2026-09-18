@@ -1,8 +1,10 @@
 /**
  * M7 Full Combined 予測エンジン
  *
- * v25: Stern補正(λ1=0.9, λ2=0.8) + PredBlend≤8フィルタ
- * 外部監査（Fable5）対応済み。モデル凍結版。
+ * v27: 芝の適性3項（馬場状態適性・距離適性・馬場適性）を除外
+ *      ダートは適性3項を維持
+ *      Stern補正(λ1=0.9, λ2=0.8) + PredBlend≤8フィルタ
+ *      Fable5外部監査で仮説A（芝の平均着順ベース適性がノイズ）を検証・確認
  */
 
 import { getDb } from "./jrdb/db";
@@ -135,6 +137,8 @@ function buildTrainingData(beforeDate: string): TrainingData {
   return { jockeyStats, horseHistory, trackPerf };
 }
 
+export type M7Version = "v25" | "v27";
+
 function computeM7Score(
   horseNumber: number,
   raceId: string,
@@ -147,7 +151,10 @@ function computeM7Score(
     idm: number | null; riderIndex: number | null; runStyle: string | null;
   },
   training: TrainingData,
+  version: M7Version = "v27",
 ): { score: number; trackFit: number; weightStability: number; distanceFit: number; surfaceFit: number } {
+  // v27: 芝では適性3項を除外（ノイズ除去）。v25: 全馬場で適性あり（旧モデル）
+  const useAptitude = version === "v25" || surface !== "芝";
   // Base: IDM
   const base = (entry.idm && entry.idm > 0) ? entry.idm : 50;
 
@@ -156,7 +163,7 @@ function computeM7Score(
 
   // Track condition fitness
   let trackFit = 0;
-  if (entry.horseId && trackCondition) {
+  if (useAptitude && entry.horseId && trackCondition) {
     const htp = training.trackPerf.get(entry.horseId);
     if (htp) {
       const tcResults = htp.get(trackCondition);
@@ -191,7 +198,7 @@ function computeM7Score(
   // Distance & surface fit
   let distanceFit = 0;
   let surfaceFit = 0;
-  if (entry.horseId) {
+  if (useAptitude && entry.horseId) {
     const hist = training.horseHistory.get(entry.horseId);
     if (hist) {
       const distRaces = hist.filter(h => h.dist && Math.abs(h.dist - distance) <= 200);
@@ -274,7 +281,7 @@ function sternTrioProb(probs: number[], i: number, j: number, k: number): number
 
 // --- 4. Main Prediction Function ---
 
-export function predictRace(raceId: string): M7Prediction | null {
+export function predictRace(raceId: string, version: M7Version = "v27"): M7Prediction | null {
   const db = getDb();
 
   // Load race info
@@ -326,6 +333,7 @@ export function predictRace(raceId: string): M7Prediction | null {
       { horseId: entry.horse_id, jockeyName: entry.jockey_name,
         idm: entry.idm, riderIndex: entry.rider_index, runStyle: entry.run_style },
       training,
+      version,
     );
     scores.push(result.score);
     odds.push(winOdds.get(hn)!);
@@ -403,7 +411,7 @@ export function predictRace(raceId: string): M7Prediction | null {
 
 // --- 5. Batch Prediction for a Date ---
 
-export function predictDate(date: string): M7Prediction[] {
+export function predictDate(date: string, version: M7Version = "v27"): M7Prediction[] {
   const db = getDb();
   const races = db.prepare(
     "SELECT race_id FROM races WHERE race_date = ? ORDER BY venue_code, race_number"
@@ -411,7 +419,7 @@ export function predictDate(date: string): M7Prediction[] {
 
   const predictions: M7Prediction[] = [];
   for (const { race_id } of races) {
-    const pred = predictRace(race_id);
+    const pred = predictRace(race_id, version);
     if (pred) predictions.push(pred);
   }
   return predictions;
@@ -422,7 +430,7 @@ export function predictDate(date: string): M7Prediction[] {
 export const M7_DISPLAY_CONFIG = {
   ...M7_CONFIG,
   modelName: "M7 Full Combined",
-  version: "v25",
-  features: ["IDM", "騎手指数", "馬場適性", "脚質", "体重安定性", "距離適性", "馬場適性"],
+  version: "v27",
+  features: ["IDM", "騎手指数", "脚質", "体重安定性", "馬場状態適性(ダートのみ)", "距離適性(ダートのみ)", "馬場適性(ダートのみ)"],
   filterDescription: "PredBlend ≤ 8 (Stern補正済み予想三連複オッズ8倍以下)",
 } as const;

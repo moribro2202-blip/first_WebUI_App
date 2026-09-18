@@ -1,0 +1,246 @@
+# -*- coding: utf-8 -*-
+"""明日のレースのEVシミュレーション
+即PATからリアルタイムオッズ取得 → モデル予測 → 100円ベットシミュレーション
+"""
+import sys, os, json, math, time, sqlite3, re
+import numpy as np
+from datetime import datetime, timedelta
+
+sys.stdout.reconfigure(encoding='utf-8')
+BASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..')
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+DB_PATH = os.path.join(BASE, 'data', 'jrdb.db')
+MODEL_DIR = os.path.join(BASE, 'data', 'models')
+
+from ipat_voter import IPATVoter
+
+BET_AMOUNT = 100  # シミュレーション: 100円
+
+# === 1. ログイン+オッズ取得 ===
+print("--- 即PATオッズ取得 ---")
+voter = IPATVoter(headless=True)
+voter.login()
+
+voter._go_to_odds_page()
+venues_raw = voter.page.evaluate('''() => {
+    const result = [];
+    document.querySelectorAll('button').forEach(b => {
+        const ng = b.getAttribute('ng-click') || '';
+        if (ng.includes('selectCourse')) result.push(b.innerText.trim().split('\\n')[0]);
+    });
+    return result;
+}''')
+
+today_venues = []
+for vt in venues_raw:
+    m = re.match(r'(.+?)[（(](.+?)[）)]', vt)
+    if m and m.group(2) == '土':
+        today_venues.append(m.group(1))
+
+print(f"  開催場（土）: {', '.join(today_venues)}")
+
+all_odds = {}
+for venue in today_venues:
+    voter._click_venue_button(venue)
+    for rn in range(1, 13):
+        voter._click_race_button(rn)
+        odds = voter._parse_odds_from_dom()
+        if odds:
+            all_odds[(venue, rn)] = odds
+    voter._go_to_odds_page()
+
+voter.close()
+print(f"  取得レース数: {len(all_odds)}")
+
+# === 2. モデルロード ===
+import lightgbm as lgb
+with open(os.path.join(MODEL_DIR, 'prod_config.json'), 'r', encoding='utf-8') as f:
+    config = json.load(f)
+model = lgb.Booster(model_file=os.path.join(MODEL_DIR, config['model_file']))
+feature_names = config['feature_names']
+b_param = config['b']
+tau_param = config['tau']
+beta = config['beta']
+ev_threshold = config['ev_threshold']
+with open(os.path.join(MODEL_DIR, config['stats_file']), 'r', encoding='utf-8') as f:
+    stats = json.load(f)
+
+# === 3. 予測 ===
+db = sqlite3.connect(DB_PATH)
+candidates = [(datetime.now() + timedelta(days=d)).strftime('%Y-%m-%d') for d in range(0, 3)]
+vc_map = {'札幌':'01','函館':'02','福島':'03','新潟':'04','東京':'05',
+          '中山':'06','中京':'07','京都':'08','阪神':'09','小倉':'10'}
+grade_map = {'G1':6,'G2':5,'G3':4,'OP':3,'L':2,'3勝':1,'2勝':0,'1勝':-1,
+             '未勝利':-2,'新馬':-3,'一般':0}
+tc_map = {'良':0,'稍重':1,'重':2,'不良':3}
+sf_map = {'芝':0,'ダート':1}
+
+all_bets = []
+
+for (venue, rnum), odds in sorted(all_odds.items()):
+    vc = vc_map.get(venue, '')
+    if not vc:
+        continue
+    rows = db.execute(
+        'SELECT race_id, race_date, surface, distance, track_condition, grade, start_time '
+        'FROM races WHERE venue_code=? AND race_number=? AND race_date>=? ORDER BY race_date LIMIT 1',
+        (vc, rnum, candidates[0])
+    ).fetchall()
+    if not rows:
+        continue
+    rid, rd, sf, dist, tc, grade, st = rows[0]
+
+    entries = {}
+    for row in db.execute(
+        'SELECT horse_number,horse_id,jockey_name,trainer_name,idm,total_index,rider_index,run_style,carried_weight '
+        'FROM entries WHERE race_id=?', (rid,)
+    ).fetchall():
+        entries[row[0]] = {
+            'hid': row[1], 'jockey': row[2], 'trainer': row[3], 'idm': row[4],
+            'total': row[5], 'rider': row[6], 'run_style': row[7], 'weight': row[8]
+        }
+    if not entries:
+        continue
+
+    horses = sorted(entries.keys())
+    n = len(horses)
+    if n < 5:
+        continue
+
+    # 市場確率
+    inv = np.array([1 / odds.get(h, 999) for h in horses])
+    mp = inv / inv.sum()
+    mp = mp ** beta
+    mp = mp / mp.sum()
+
+    # 前日オッズ
+    oz = {}
+    for row in db.execute("SELECT combination,odds FROM odds WHERE race_id=? AND bet_type='win'", (rid,)).fetchall():
+        try:
+            oz[int(row[0])] = row[1]
+        except:
+            pass
+    oz_inv = {h: 1 / oz[h] if h in oz and oz[h] > 0 else 0 for h in horses}
+    mk_inv = {h: 1 / odds.get(h, 999) for h in horses}
+    oz_sum = sum(oz_inv.values()) or 1
+    mk_sum = sum(mk_inv.values()) or 1
+
+    idms = [entries.get(h, {}).get('idm') or 50 for h in horses]
+    avg_idm = np.mean(idms)
+    riders = [entries.get(h, {}).get('rider') or 0 for h in horses]
+    avg_rider = np.mean(riders)
+
+    # 特徴量
+    X = []
+    init_scores = []
+    for i, h in enumerate(horses):
+        ent = entries.get(h, {})
+        hid = ent.get('hid', '')
+        idm = ent.get('idm') or 50
+        rider = ent.get('rider') or 0
+        jn = ent.get('jockey', '')
+        tn = ent.get('trainer', '')
+
+        f = {}
+        f['idm_c'] = idm - avg_idm
+        f['rider_c'] = rider - avg_rider
+        f['total_index'] = ent.get('total') or 0
+        oz_p = oz_inv.get(h, 0) / oz_sum
+        mk_p = mk_inv.get(h, 0) / mk_sum
+        f['expert_resid'] = math.log(max(oz_p, 1e-6)) - math.log(max(mk_p, 1e-6)) if oz_p > 0 and mk_p > 0 else 0
+
+        js = stats.get('jockey_stats', {}).get(jn, {})
+        f['jockey_t3rate'] = js.get('t3', 0) / js['r'] if js.get('r', 0) >= 30 else -1
+        ts = stats.get('trainer_stats', {}).get(tn, {})
+        f['trainer_t3rate'] = ts.get('t3', 0) / ts['r'] if ts.get('r', 0) >= 30 else -1
+
+        runs = stats.get('horse_history', {}).get(hid, [])
+        f['horse_runs'] = len(runs)
+        if runs:
+            rc = runs[-5:]
+            f['avg_fp_5'] = np.mean([r['fp'] for r in rc])
+            f['top3_rate'] = sum(1 for r in runs if r['fp'] <= 3) / len(runs)
+            f['last_fp'] = runs[-1]['fp']
+            dr = [r for r in runs if abs(r.get('dist', 0) - dist) <= 200]
+            f['dist_t3rate'] = sum(1 for r in dr if r['fp'] <= 3) / len(dr) if dr else -1
+            sr = [r for r in runs if r.get('surface') == sf]
+            f['surf_t3rate'] = sum(1 for r in sr if r['fp'] <= 3) / len(sr) if sr else -1
+            f['trend'] = runs[-3]['fp'] - runs[-1]['fp'] if len(runs) >= 3 else 0
+            f['win_rate'] = sum(1 for r in runs if r['fp'] == 1) / len(runs) if len(runs) >= 5 else -1
+        else:
+            f.update({'avg_fp_5': 8, 'top3_rate': 0, 'last_fp': 8, 'dist_t3rate': -1,
+                      'surf_t3rate': -1, 'trend': 0, 'win_rate': -1})
+
+        f['nhead'] = n
+        f['distance'] = dist
+        f['surface'] = sf_map.get(sf, 0)
+        f['track_cond'] = tc_map.get(tc or '良', 0)
+        f['grade'] = grade_map.get(grade or '一般', 0)
+        f['is_senkou'] = 1 if ent.get('run_style', '') in ('逃げ', '先行') else 0
+        f['gate_ratio'] = h / n
+        cw = ent.get('weight') or 0
+        avg_cw = np.mean([entries.get(h2, {}).get('weight') or 0 for h2 in horses])
+        f['weight_c'] = (cw - avg_cw) if cw > 0 else 0
+        f['move_5to1'] = 0
+
+        X.append([f.get(k, 0) for k in feature_names])
+        p = mp[i]
+        init_scores.append(math.log(max(p, 1e-15)) - math.log(max(1 - p, 1e-15)))
+
+    X = np.array(X, dtype=np.float32)
+    init_scores = np.array(init_scores, dtype=np.float64)
+    raw = model.predict(X, raw_score=True)
+    s = b_param * init_scores + tau_param * raw
+    s -= s.max()
+    probs = np.exp(s) / np.exp(s).sum()
+
+    race_name = db.execute('SELECT race_name FROM races WHERE race_id=?', (rid,)).fetchone()[0] or ''
+
+    for i, h in enumerate(horses):
+        o = odds.get(h, 0)
+        ev = probs[i] * o if o > 0 else 0
+        if ev >= ev_threshold:
+            all_bets.append({
+                'venue': venue, 'race': rnum, 'horse': h,
+                'odds': o, 'prob': float(probs[i]), 'ev': float(ev),
+                'sf': sf, 'dist': dist, 'st': st, 'grade': grade,
+                'race_name': race_name,
+            })
+
+db.close()
+
+# === 4. シミュレーション結果 ===
+all_bets.sort(key=lambda x: -x['ev'])
+total_invest = len(all_bets) * BET_AMOUNT
+
+print()
+print('=' * 70)
+print(f'  明日(9/12) ベットシミュレーション')
+print(f'  単勝 {BET_AMOUNT}円 × {len(all_bets)}レース = 投資{total_invest:,}円')
+print('=' * 70)
+print()
+print(f'  {"#":>2} {"レース":<12} {"馬番":>4} {"オッズ":>7} {"モデルP":>7} {"EV":>6} {"期待払戻":>8}')
+print(f'  {"-" * 60}')
+
+total_expected = 0
+for i, b in enumerate(all_bets):
+    expected = b['prob'] * b['odds'] * BET_AMOUNT
+    total_expected += expected
+    nm = b.get('race_name') or ''
+    label = f"{b['venue']}{b['race']:>2}R"
+    if nm:
+        label += f" {nm[:6]}"
+    print(f'  {i+1:>2} {label:<12} {b["horse"]:>4} {b["odds"]:>6.1f}x {b["prob"]:>6.3f} {b["ev"]:>5.2f} {expected:>7.0f}円')
+
+print(f'  {"-" * 60}')
+print()
+print(f'  投資合計:     {total_invest:>7,}円 ({len(all_bets)}R × {BET_AMOUNT}円)')
+print(f'  期待払戻合計: {total_expected:>7,.0f}円')
+print(f'  期待回収率:   {total_expected / total_invest * 100:>7.1f}%')
+print(f'  期待収支:     {total_expected - total_invest:>+7,.0f}円')
+print()
+print('  注意:')
+print('  - オッズは前夜時点。発走直前に変動します。')
+print('  - 的中するかは確率次第。EV>1.0は長期的にプラスの期待値を意味します。')
+print(f'  - 仮に全{len(all_bets)}頭が当たれば: {sum(b["odds"] * BET_AMOUNT for b in all_bets):,.0f}円')
+print(f'  - 期待的中数: {sum(b["prob"] for b in all_bets):.1f}頭')
