@@ -931,20 +931,32 @@ def main():
             actual_bt = bet.get('bet_type', best_type)  # ポートフォリオ時は個別の券種
             ts_bet = datetime.now()
 
-            if actual_bt == 'win' and is_live:
-                # 単勝のみ実投票
-                hn = int(combo)
-                success, status = voter.place_bet(
-                    race['venue_code'], rn, hn, amount=amt,
-                    ev=bet['ev'], model_prob=bet['model_prob'], odds_1min=bet.get('est_odds', 0)
-                )
+            if is_live:
+                bt_jp = BET_TYPE_JP.get(actual_bt, actual_bt)
+                if actual_bt == 'win':
+                    # 単勝
+                    hn = int(combo)
+                    success, status = voter.place_bet(
+                        race['venue_code'], rn, hn, amount=amt,
+                        ev=bet['ev'], model_prob=bet['model_prob'], odds_1min=bet.get('est_odds', 0)
+                    )
+                elif actual_bt in ('sanrenpuku', 'sanrentan'):
+                    # 三連複・三連単
+                    horses = tuple(int(h) for h in combo.split('-'))
+                    with voter_lock:
+                        success, status = voter.place_multi_bet(
+                            vn, rn, actual_bt, horses, amount=amt,
+                            ev=bet['ev'], model_prob=bet['model_prob']
+                        )
+                else:
+                    success, status = False, 'unsupported_type'
                 ts_bet_done = datetime.now()
                 bet_time = (ts_bet_done - ts_bet).total_seconds()
                 bet['status'] = 'success' if success else 'failed'
                 bet['is_live'] = 1
-                log(f"  -> {'OK' if success else 'NG'} {label} 馬番{hn} 単勝 {amt}円 ({bet_time:.1f}秒)")
+                log(f"  -> {'OK' if success else 'NG'} {label} {bt_jp} {combo} {amt}円 ({bet_time:.1f}秒)")
             else:
-                # 連系はペーパー記録
+                # ペーパー記録
                 bt_jp = BET_TYPE_JP.get(actual_bt, actual_bt)
                 bet['status'] = f'{actual_bt}_paper'
                 bet['is_live'] = 0
