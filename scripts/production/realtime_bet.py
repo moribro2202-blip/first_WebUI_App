@@ -939,45 +939,50 @@ def main():
         bets = best_bets
         per_bet = bets[0]['amount'] if bets else 100
 
-        for bet in bets:
-            combo = bet['combo']
-            amt = bet['amount']
-            actual_bt = bet.get('bet_type', best_type)  # ポートフォリオ時は個別の券種
-            ts_bet = datetime.now()
+        if is_live and bets:
+            # 三連複・三連単を一括投票
+            multi_bets = [b for b in bets if b.get('bet_type') in ('sanrenpuku', 'sanrentan')]
+            win_bets = [b for b in bets if b.get('bet_type') == 'win']
 
-            if is_live:
-                bt_jp = BET_TYPE_JP.get(actual_bt, actual_bt)
-                if actual_bt == 'win':
-                    # 単勝
-                    hn = int(combo)
-                    success, status = voter.place_bet(
-                        race['venue_code'], rn, hn, amount=amt,
-                        ev=bet['ev'], model_prob=bet['model_prob'], odds_1min=bet.get('est_odds', 0)
-                    )
-                elif actual_bt in ('sanrenpuku', 'sanrentan'):
-                    # 三連複・三連単
-                    horses = tuple(int(h) for h in combo.split('-'))
-                    with voter_lock:
-                        success, status = voter.place_multi_bet(
-                            vn, rn, actual_bt, horses, amount=amt,
-                            ev=bet['ev'], model_prob=bet['model_prob']
-                        )
-                else:
-                    success, status = False, 'unsupported_type'
-                ts_bet_done = datetime.now()
-                bet_time = (ts_bet_done - ts_bet).total_seconds()
+            if multi_bets:
+                ts_bet = datetime.now()
+                batch_list = [{
+                    'bet_type': b['bet_type'],
+                    'combination': tuple(int(h) for h in b['combo'].split('-')),
+                    'amount': b['amount'],
+                    'ev': b['ev'],
+                } for b in multi_bets]
+
+                with voter_lock:
+                    ok_count, total_count = voter.place_multi_bets_batch(vn, rn, batch_list)
+
+                ts_done = datetime.now()
+                bet_time = (ts_done - ts_bet).total_seconds()
+
+                for b in multi_bets:
+                    b['status'] = 'success' if ok_count > 0 else 'failed'
+                    b['is_live'] = 1
+                log(f"  -> {'OK' if ok_count>0 else 'NG'} {label} 一括{ok_count}/{total_count}点 ({bet_time:.1f}秒)")
+
+            for bet in win_bets:
+                hn = int(bet['combo'])
+                success, status = voter.place_bet(
+                    race['venue_code'], rn, hn, amount=bet['amount'],
+                    ev=bet['ev'], model_prob=bet['model_prob'], odds_1min=bet.get('est_odds', 0)
+                )
                 bet['status'] = 'success' if success else 'failed'
                 bet['is_live'] = 1
-                log(f"  -> {'OK' if success else 'NG'} {label} {bt_jp} {combo} {amt}円 ({bet_time:.1f}秒)")
-            else:
-                # ペーパー記録
-                bt_jp = BET_TYPE_JP.get(actual_bt, actual_bt)
-                bet['status'] = f'{actual_bt}_paper'
-                bet['is_live'] = 0
-                log(f"  -> [PAPER] {label} {bt_jp} {combo} EV={bet['ev']:.3f} {amt}円")
 
-            total_bet += amt
-            total_payout_expected += bet['ev'] * amt
+        elif not is_live:
+            for bet in bets:
+                bt_jp = BET_TYPE_JP.get(bet.get('bet_type', ''), '')
+                bet['status'] = f'{bet.get("bet_type","")}_paper'
+                bet['is_live'] = 0
+                log(f"  -> [PAPER] {label} {bt_jp} {bet['combo']} EV={bet['ev']:.3f} {bet['amount']}円")
+
+        for bet in bets:
+            total_bet += bet['amount']
+            total_payout_expected += bet['ev'] * bet['amount']
             bet_count += 1
 
         # DB保存（全券種のペーパー記録）

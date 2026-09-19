@@ -454,6 +454,211 @@ class IPATVoter:
         self._log_bet(venue_code, race_number, horse_number, amount, status, ev, model_prob, odds_1min)
         return status == 'success', status
 
+    def place_multi_bets_batch(self, venue_name, race_number, bets_list):
+        """三連複・三連単を一括投票（同一レース、まとめてセット→1回で購入）
+
+        Args:
+            venue_name: '中山', '阪神' etc.
+            race_number: レース番号
+            bets_list: [{'bet_type': 'sanrenpuku'|'sanrentan', 'combination': (h1,h2,h3), 'amount': 100, 'ev': 1.0}, ...]
+
+        Returns:
+            (success_count, total_count)
+        """
+        if not bets_list:
+            return 0, 0
+        if not self.logged_in:
+            if not self.login():
+                return 0, 0
+
+        total = len(bets_list)
+        try:
+            # 1. オッズ投票画面→場所→レース選択
+            self._go_to_odds_page()
+            self._click_venue_button(venue_name)
+            self._click_race_button(race_number)
+            time.sleep(2)
+
+            set_count = 0
+            current_type = None
+
+            for bet in bets_list:
+                bt = bet['bet_type']
+                h1, h2, h3 = bet['combination']
+                amount = bet.get('amount', 100)
+                combo_str = f'{h1}-{h2}-{h3}'
+
+                # 式別が変わったら切り替え
+                type_id = 'string:7' if bt == 'sanrenpuku' else 'string:8'
+                if current_type != type_id:
+                    self.page.evaluate(f'''() => {{
+                        var sel = document.querySelector('select[ng-model="vm.cSelectTypeId"]');
+                        if (!sel) return;
+                        for (var i=0; i<sel.options.length; i++) {{
+                            if (sel.options[i].value === '{type_id}') {{
+                                sel.selectedIndex = i;
+                                sel.dispatchEvent(new Event('change', {{bubbles: true}}));
+                                var e = document.createEvent('HTMLEvents');
+                                e.initEvent('change', true, true);
+                                sel.dispatchEvent(e);
+                                return;
+                            }}
+                        }}
+                    }}''')
+                    time.sleep(2)
+                    current_type = type_id
+
+                # 三連単の場合: 1着馬を選択
+                if bt == 'sanrentan':
+                    self.page.evaluate(f'''() => {{
+                        var sel = document.querySelector('select[ng-model="vm.oSelectAxisHorse"]');
+                        if (!sel) return;
+                        for (var i=0; i<sel.options.length; i++) {{
+                            if (parseInt(sel.options[i].text) === {h1}) {{
+                                sel.selectedIndex = i;
+                                sel.dispatchEvent(new Event('change', {{bubbles: true}}));
+                                var e = document.createEvent('HTMLEvents');
+                                e.initEvent('change', true, true);
+                                sel.dispatchEvent(e);
+                                return;
+                            }}
+                        }}
+                    }}''')
+                    time.sleep(1)
+
+                # オッズボタンをクリック
+                if bt == 'sanrenpuku':
+                    sh1, sh2, sh3 = sorted([h1, h2, h3])
+                    clicked = self.page.evaluate(f'''() => {{
+                        var btns = document.querySelectorAll('.btn-odds');
+                        for (var i=0; i<btns.length; i++) {{
+                            var scope = angular.element(btns[i]).scope();
+                            var o = (scope && scope.oOdds) ? scope.oOdds : (scope && scope.odds) ? scope.odds : null;
+                            if (o && parseInt(o.horse1)==={sh1} && parseInt(o.horse2)==={sh2} && parseInt(o.horse3)==={sh3}) {{
+                                btns[i].scrollIntoView({{block: 'center'}});
+                                btns[i].click();
+                                return true;
+                            }}
+                        }}
+                        return false;
+                    }}''')
+                else:
+                    clicked = self.page.evaluate(f'''() => {{
+                        var btns = document.querySelectorAll('.btn-odds');
+                        for (var i=0; i<btns.length; i++) {{
+                            var scope = angular.element(btns[i]).scope();
+                            var o = (scope && scope.odds) ? scope.odds : (scope && scope.oOdds) ? scope.oOdds : null;
+                            if (o && parseInt(o.horse1)==={h1} && parseInt(o.horse2)==={h2} && parseInt(o.horse3)==={h3}) {{
+                                btns[i].scrollIntoView({{block: 'center'}});
+                                btns[i].click();
+                                return true;
+                            }}
+                        }}
+                        return false;
+                    }}''')
+
+                if not clicked:
+                    print(f"  [IPAT] {combo_str} 見つからず、スキップ")
+                    continue
+
+                time.sleep(0.5)
+
+                # 金額入力 + セット
+                amount_100 = amount // 100
+                unit_input = self.page.locator('input[ng-model="vm.nUnit"]').first
+                unit_input.click()
+                unit_input.fill(str(amount_100))
+                time.sleep(0.3)
+
+                self.page.evaluate('''() => {
+                    var btns = document.querySelectorAll('button[ng-click="vm.onSet()"]');
+                    for (var i=0; i<btns.length; i++) {
+                        if (btns[i].offsetParent !== null) { btns[i].click(); return; }
+                    }
+                }''')
+                time.sleep(0.5)
+                set_count += 1
+                type_jp = '三連複' if bt == 'sanrenpuku' else '三連単'
+                print(f"  [IPAT] セット {set_count}/{total}: {type_jp} {combo_str} {amount}円")
+
+            if set_count == 0:
+                print(f"  [IPAT] セットできた点数が0")
+                return 0, total
+
+            # 入力終了
+            self.page.evaluate('''() => {
+                var btns = document.querySelectorAll('button[ng-click="vm.onShowBetList()"]');
+                for (var i=0; i<btns.length; i++) {
+                    if (btns[i].offsetParent !== null) { btns[i].click(); return; }
+                }
+            }''')
+            time.sleep(2)
+
+            # 合計金額入力
+            total_amount = sum(b.get('amount', 100) for b in bets_list[:set_count])
+            self.page.evaluate(f'''() => {{
+                var inp = document.querySelector('input[ng-model="vm.cAmountTotal"]');
+                if (inp && inp.offsetParent !== null) {{
+                    inp.focus();
+                    inp.value = '{total_amount}';
+                    inp.dispatchEvent(new Event('input', {{bubbles: true}}));
+                    inp.dispatchEvent(new Event('change', {{bubbles: true}}));
+                }}
+            }}''')
+            time.sleep(1)
+
+            # 購入する
+            self.page.evaluate('''() => {
+                var btns = document.querySelectorAll('button[ng-click="vm.clickPurchase()"]');
+                for (var i=0; i<btns.length; i++) {
+                    if (btns[i].offsetParent !== null) { btns[i].click(); return; }
+                }
+            }''')
+            time.sleep(3)
+
+            # PARS暗証番号
+            pars = self.config.get('IPAT_PARS_NUMBER', '')
+            if pars:
+                try:
+                    pars_input = self.page.locator('input[type="password"]')
+                    if pars_input.count() > 0:
+                        pars_input.first.fill(pars)
+                        time.sleep(0.5)
+                        self.page.evaluate('''() => {
+                            var btns = document.querySelectorAll('button');
+                            for (var i=0; i<btns.length; i++) {
+                                var text = btns[i].innerText.trim();
+                                if (btns[i].offsetParent !== null && (text === '購入' || text === 'OK' || text === '投票する')) {
+                                    btns[i].click(); return;
+                                }
+                            }
+                        }''')
+                        time.sleep(2)
+                except:
+                    pass
+
+            # 確認ダイアログ
+            for ct in ['OK', 'はい']:
+                try:
+                    self.page.click(f'text={ct}', timeout=2000)
+                    time.sleep(1)
+                except:
+                    pass
+
+            # 結果確認
+            text = self.page.evaluate('document.body.innerText')
+            if '受付' in text or '完了' in text:
+                self.daily_bet_total += total_amount
+                print(f"  [IPAT] 一括投票成功: {set_count}点 {total_amount}円")
+                return set_count, total
+            else:
+                print(f"  [IPAT] 一括投票結果不明")
+                return 0, total
+
+        except Exception as e:
+            print(f"  [IPAT] 一括投票エラー: {e}")
+            return 0, total
+
     def place_multi_bet(self, venue_name, race_number, bet_type, combination, amount=100,
                          ev=0, model_prob=0):
         """三連複・三連単の投票（オッズ投票画面から）
