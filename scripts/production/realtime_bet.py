@@ -107,7 +107,8 @@ def predict_trio(race_data, odds_early, odds_late, trio_model, trio_config):
     feature_names_trio = trio_config['feature_names']
     lam2 = trio_config.get('lam2', 0.8076)
     lam3 = trio_config.get('lam3', 0.6978)
-    takeout = trio_config.get('takeout', 0.25)
+    takeout_raw = trio_config.get('takeout', 0.25)
+    takeout = takeout_raw.get('sanrenpuku', 0.25) if isinstance(takeout_raw, dict) else takeout_raw
     b_trio = trio_config['b']
     tau_trio = trio_config['tau']
     ev_th = trio_config.get('ev_threshold', 1.2)
@@ -909,9 +910,19 @@ def main():
         log(f"  top1: 馬番{selection['top1_hn']} 勝率{selection['top1_prob']:.1%}")
         log(f"  候補: {' '.join(f'{BET_TYPE_JP.get(k,k)}={v}点' for k,v in all_cands.items() if v>0)}")
 
-        # 単勝top5表示（参考）
+        # 単勝top5表示
         for pred in predictions[:5]:
             log(f"  馬番{pred['horse_number']:>2} odds={pred['odds']:>5.1f} P={pred['model_prob']:.3f} EV={pred['ev']:.3f} move={pred['move']:+.3f}")
+
+        # 三連複EV上位5表示
+        trio_top = selection.get('trio_top', [])
+        if trio_top:
+            log(f"  三連複EV上位 (閾値{ev_threshold_trio}):")
+            for t in trio_top:
+                mark = '★' if t['ev'] >= ev_threshold_trio else ' '
+                log(f"   {mark} {t['combo']} EV={t['ev']:.3f} P={t['model_prob']:.4f} odds≈{t['est_odds']:.0f}")
+        else:
+            log(f"  三連複: 候補なし")
 
         if best_type:
             bt_jp = BET_TYPE_JP.get(best_type, best_type)

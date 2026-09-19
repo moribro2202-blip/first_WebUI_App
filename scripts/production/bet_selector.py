@@ -177,9 +177,10 @@ def select_best_bets(horses, win_probs, odds_3min, odds_5min,
     um_cands.sort(key=lambda x: -x['ev'])
     candidates['umaren'] = um_cands
 
-    # --- 三連複（トリオ残差モデル or SHのみ、1番人気含む、EV>=1.0）---
+    # --- 三連複（トリオ残差モデル or SHのみ、1番人気含む、EV>=閾値）---
     TRIO_EV_THRESHOLD = ev_threshold_trio
     trio_cands = []
+    trio_all = []  # 閾値以下も含む全候補（ログ表示用）
     tr_model = exotic_models.get('trio') if exotic_models else trio_model
     tr_info = exotic_config.get('models',{}).get('trio',{}) if exotic_config else (trio_config or {})
     tr_cal = exotic_config.get('odds_calibration',{}).get('sanrenpuku',[]) if exotic_config else []
@@ -196,6 +197,7 @@ def select_best_bets(horses, win_probs, odds_3min, odds_5min,
             cal_odds = apply_odds_calibration(tp['est_odds'], tr_cal)
             tp['ev'] = tp['model_prob'] * cal_odds
             tp['est_odds'] = cal_odds
+            trio_all.append(tp)
             if tp['ev'] >= TRIO_EV_THRESHOLD:
                 trio_cands.append(tp)
     else:
@@ -219,14 +221,17 @@ def select_best_bets(horses, win_probs, odds_3min, odds_5min,
             est_odds = (1/sh_p) * (1-TAKEOUT['sanrenpuku'])
             cal_odds = apply_odds_calibration(est_odds, tr_cal)
             ev = sh_p * cal_odds
+            h1, h2, h3 = horses[a], horses[b], horses[c]
+            entry = {
+                'combo': '-'.join(str(x) for x in sorted([h1, h2, h3])),
+                'ev': float(ev), 'model_prob': float(sh_p),
+                'est_odds': float(cal_odds), 'bet_type': 'sanrenpuku',
+            }
+            trio_all.append(entry)
             if ev >= TRIO_EV_THRESHOLD:
-                h1, h2, h3 = horses[a], horses[b], horses[c]
-                trio_cands.append({
-                    'combo': '-'.join(str(x) for x in sorted([h1, h2, h3])),
-                    'ev': float(ev), 'model_prob': float(sh_p),
-                    'est_odds': float(cal_odds), 'bet_type': 'sanrenpuku',
-                })
+                trio_cands.append(entry)
     trio_cands.sort(key=lambda x: -x['ev'])
+    trio_all.sort(key=lambda x: -x['ev'])
     candidates['sanrenpuku'] = trio_cands
 
     # === v23 券種選択ロジック ===
@@ -345,6 +350,7 @@ def select_best_bets(horses, win_probs, odds_3min, odds_5min,
         'bets': best_bets,
         'reason': best_reason,
         'all_candidates': {bt: len(c) for bt, c in candidates.items()},
+        'trio_top': trio_all[:5],  # 三連複EV上位5（閾値以下も含む）
         'top1_prob': float(top1_prob),
         'top1_hn': int(top1_hn),
     }
