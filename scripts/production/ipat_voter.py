@@ -569,82 +569,96 @@ class IPATVoter:
 
             time.sleep(1)
 
-            # 4. 金額入力（三連複/三連単はvm.cAmount、単勝はvm.nUnit）
+            # 4. 金額入力（vm.nUnit）
             amount_100 = amount // 100
-            filled = self.page.evaluate(f'''() => {{
-                // vm.cAmount (三連複/三連単)
-                var inp = document.querySelector('input[ng-model="vm.cAmount"]');
-                if (inp && inp.offsetParent !== null) {{
-                    inp.focus();
-                    inp.value = '{amount_100}';
-                    inp.dispatchEvent(new Event('input', {{bubbles: true}}));
-                    inp.dispatchEvent(new Event('change', {{bubbles: true}}));
-                    return 'cAmount';
-                }}
-                // vm.nUnit (単勝)
-                inp = document.querySelector('input[ng-model="vm.nUnit"]');
-                if (inp && inp.offsetParent !== null) {{
-                    inp.focus();
-                    inp.value = '{amount_100}';
-                    inp.dispatchEvent(new Event('input', {{bubbles: true}}));
-                    inp.dispatchEvent(new Event('change', {{bubbles: true}}));
-                    return 'nUnit';
-                }}
-                return 'not found';
-            }}''')
+            unit_input = self.page.locator('input[ng-model="vm.nUnit"]').first
+            unit_input.click()
+            unit_input.fill(str(amount_100))
             time.sleep(0.5)
 
-            # 5. セット
+            # 5. セット（vm.onSet()）
             self.page.evaluate('''() => {
-                var btns = document.querySelectorAll('button');
+                var btns = document.querySelectorAll('button[ng-click="vm.onSet()"]');
                 for (var i=0; i<btns.length; i++) {
-                    if (btns[i].innerText.trim() === 'セット') {
-                        btns[i].click();
-                        return;
-                    }
+                    if (btns[i].offsetParent !== null) { btns[i].click(); return; }
                 }
             }''')
             time.sleep(1)
 
             self._screenshot(f'multi_set_{race_number}R_{combo_str}')
 
-            # 6. 入力終了 → 購入する
+            # 6. 入力終了（vm.onShowBetList()）→ 購入予定リスト表示
             self.page.evaluate('''() => {
-                var btns = document.querySelectorAll('button');
+                var btns = document.querySelectorAll('button[ng-click="vm.onShowBetList()"]');
                 for (var i=0; i<btns.length; i++) {
-                    if (btns[i].innerText.trim() === '入力終了') {
-                        btns[i].click(); return;
-                    }
+                    if (btns[i].offsetParent !== null) { btns[i].click(); return; }
                 }
             }''')
             time.sleep(2)
 
+            # 7. 合計金額入力（vm.cAmountTotal） — 購入確認用
+            total_amount = amount  # 1点の場合。複数点まとめ買い時は呼び出し側で調整
+            self.page.evaluate(f'''() => {{
+                var inp = document.querySelector('input[ng-model="vm.cAmountTotal"]');
+                if (inp && inp.offsetParent !== null) {{
+                    inp.focus();
+                    inp.value = '{total_amount}';
+                    inp.dispatchEvent(new Event('input', {{bubbles: true}}));
+                    inp.dispatchEvent(new Event('change', {{bubbles: true}}));
+                }}
+            }}''')
+            time.sleep(1)
+
+            # 8. 購入する（vm.clickPurchase()）
             self.page.evaluate('''() => {
-                var btns = document.querySelectorAll('button');
+                var btns = document.querySelectorAll('button[ng-click="vm.clickPurchase()"]');
                 for (var i=0; i<btns.length; i++) {
-                    if (btns[i].innerText.includes('購入する')) {
-                        btns[i].click(); return;
-                    }
+                    if (btns[i].offsetParent !== null) { btns[i].click(); return; }
                 }
             }''')
-            time.sleep(2)
+            time.sleep(3)
 
-            # 7. 確認ダイアログ（OK/はい/購入）
-            for confirm_text in ['OK', 'はい', '購入']:
+            # 9. INET-ID暗証番号入力（PARS番号）が求められる場合
+            pars = self.config.get('IPAT_PARS_NUMBER', '')
+            if pars:
                 try:
-                    self.page.click(f'text={confirm_text}', timeout=3000)
+                    pars_input = self.page.locator('input[type="password"]')
+                    if pars_input.count() > 0:
+                        pars_input.first.fill(pars)
+                        time.sleep(0.5)
+                        # 購入確定ボタン
+                        self.page.evaluate('''() => {
+                            var btns = document.querySelectorAll('button');
+                            for (var i=0; i<btns.length; i++) {
+                                var text = btns[i].innerText.trim();
+                                if (btns[i].offsetParent !== null && (text === '購入' || text === 'OK' || text === '投票する')) {
+                                    btns[i].click(); return;
+                                }
+                            }
+                        }''')
+                        time.sleep(2)
+                except:
+                    pass
+
+            # 10. 確認ダイアログ（追加のOK/はい）
+            for confirm_text in ['OK', 'はい']:
+                try:
+                    self.page.click(f'text={confirm_text}', timeout=2000)
                     time.sleep(1)
                 except:
                     pass
 
             self._screenshot(f'multi_result_{race_number}R_{combo_str}')
 
-            # 8. 結果確認
+            # 10. 結果確認
             text = self.page.evaluate('document.body.innerText')
-            if '受付' in text or '完了' in text or '購入' in text:
+            if '受付' in text or '完了' in text:
                 self.daily_bet_total += amount
                 print(f"  [IPAT] 投票成功: {type_jp} {combo_str} {amount}円")
                 status = 'success'
+            elif '購入予定リスト' in text:
+                print(f"  [IPAT] 購入確認画面で停止（手動確認要）")
+                status = 'uncertain'
             else:
                 print(f"  [IPAT] 投票結果不明（手動確認要）")
                 status = 'uncertain'
