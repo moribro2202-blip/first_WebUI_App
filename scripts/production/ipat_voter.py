@@ -481,8 +481,17 @@ class IPATVoter:
 
             set_count = 0
             current_type = None
+            current_axis = None
 
-            for bet in bets_list:
+            # 同じ券種・同じ1着馬をまとめるためにソート
+            # 三連単(string:8)を先、三連複(string:7)を後にする
+            # 三連単は1着馬(h1)でグループ化
+            sorted_bets = sorted(bets_list, key=lambda b: (
+                0 if b['bet_type'] == 'sanrentan' else 1,
+                b['combination'][0] if b['bet_type'] == 'sanrentan' else 0
+            ))
+
+            for bet in sorted_bets:
                 bt = bet['bet_type']
                 h1, h2, h3 = bet['combination']
                 amount = bet.get('amount', 100)
@@ -505,16 +514,18 @@ class IPATVoter:
                             }}
                         }}
                     }}''')
-                    time.sleep(2)
+                    time.sleep(4)  # 式別切替後のオッズ読込に時間がかかる
                     current_type = type_id
+                    current_axis = None
 
-                # 三連単の場合: 1着馬を選択
-                if bt == 'sanrentan':
+                # 軸馬が変わったら切替（三連単=1着馬、三連複=最小馬番）
+                axis_horse = h1 if bt == 'sanrentan' else min(h1, h2, h3)
+                if axis_horse != current_axis:
                     self.page.evaluate(f'''() => {{
                         var sel = document.querySelector('select[ng-model="vm.oSelectAxisHorse"]');
                         if (!sel) return;
                         for (var i=0; i<sel.options.length; i++) {{
-                            if (parseInt(sel.options[i].text) === {h1}) {{
+                            if (parseInt(sel.options[i].text) === {axis_horse}) {{
                                 sel.selectedIndex = i;
                                 sel.dispatchEvent(new Event('change', {{bubbles: true}}));
                                 var e = document.createEvent('HTMLEvents');
@@ -524,7 +535,8 @@ class IPATVoter:
                             }}
                         }}
                     }}''')
-                    time.sleep(1)
+                    time.sleep(2)
+                    current_axis = axis_horse
 
                 # オッズボタンをクリック
                 if bt == 'sanrenpuku':
