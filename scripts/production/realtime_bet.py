@@ -835,11 +835,12 @@ def main():
                 if remaining > 0:
                     time.sleep(remaining)
 
-        # === 5時点のオッズ取得: 発走5/4/3/2/1分前（即PATから取得） ===
+        # === オッズ取得: T-5, T-4, T-3 → 判定 → 投票 → T-2, T-1（記録用） ===
         odds_all = {}
         timestamps = {'start_time': st, 'deadline': dl}
 
-        for mins_before in [5, 4, 3, 2, 1]:
+        # T-5, T-4, T-3 を取得
+        for mins_before in [5, 4, 3]:
             snap_label = f'{mins_before}min'
 
             if not args.dry_run and mins_before < 5:
@@ -872,8 +873,8 @@ def main():
             log(f"{label} 5分前オッズなし、スキップ")
             continue
 
-        # 判定用オッズ: 3分前（なければ最も近い時点）
-        odds_judge = odds_all.get('3min', odds_all.get('2min', odds_all.get('1min', odds_all['5min'])))
+        # === T-3取得後すぐ判定（2分の投票余裕） ===
+        odds_judge = odds_all.get('3min', odds_all['5min'])
         odds_early = odds_all['5min']
 
         # 特徴量構築（3分前オッズで市場確率）
@@ -995,17 +996,26 @@ def main():
             except Exception as e:
                 log(f"  DB保存エラー: {e}")
 
-        # === 1分前オッズが取れていなければ再取得（投票後でもオッズは見れる） ===
-        if '1min' not in odds_all:
-            log(f"{label} 1分前オッズ再取得...")
-            retry_odds = voter.get_odds(vn, rn)
-            if retry_odds:
-                odds_all['1min'] = retry_odds
-                timestamps['1min_start'] = datetime.now().isoformat()
-                timestamps['1min_done'] = datetime.now().isoformat()
-                log(f"{label} 1分前オッズ再取得成功 {len(retry_odds)}頭")
-            else:
-                log(f"{label} 1分前オッズ再取得も失敗")
+        # === 投票後にT-2, T-1を記録用に取得 ===
+        for mins_after in [2, 1]:
+            snap_label = f'{mins_after}min'
+            if snap_label in odds_all:
+                continue
+            if not args.dry_run:
+                target_dt = start_dt - timedelta(minutes=mins_after)
+                wait = (target_dt - datetime.now()).total_seconds()
+                if wait > 0:
+                    time.sleep(wait)
+            try:
+                with voter_lock:
+                    odds = voter.refresh_odds_on_page(rn)
+                if odds:
+                    odds_all[snap_label] = odds
+                    timestamps[f'{snap_label}_start'] = datetime.now().isoformat()
+                    timestamps[f'{snap_label}_done'] = datetime.now().isoformat()
+                    log(f"{label} 発走{mins_after}分前 {len(odds)}頭（記録用）")
+            except:
+                pass
 
         # ログ保存（全時点記録）
         save_log(race, odds_all, predictions, bets, timestamps, bet_amount=per_bet if bets else 100)
