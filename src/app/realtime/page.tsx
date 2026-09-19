@@ -458,7 +458,7 @@ export default function RealtimePage() {
         </Card>
       )}
 
-      {/* 投票履歴 */}
+      {/* 投票履歴（レースごとにグループ化） */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">投票履歴</CardTitle>
@@ -467,56 +467,93 @@ export default function RealtimePage() {
           {bets.length === 0 ? (
             <p className="text-sm text-muted-foreground">本日の投票はまだありません</p>
           ) : (
-            <div className="space-y-2">
-              {bets.map((bet) => (
-                <div
-                  key={bet.id}
-                  className={cn(
-                    "flex items-center justify-between rounded-md border p-3 text-sm",
-                    bet.result === "hit" && "border-green-300 bg-green-50 dark:border-green-800 dark:bg-green-950",
-                    bet.result === "miss" && "border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950",
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    {bet.result === "hit" ? (
-                      <TrendingUp className="h-4 w-4 text-green-600" />
-                    ) : bet.result === "miss" ? (
-                      <TrendingDown className="h-4 w-4 text-red-500" />
-                    ) : (
-                      <CircleDot className="h-4 w-4 text-muted-foreground" />
-                    )}
-                    <div>
-                      <span className="font-medium">
-                        {bet.venue_name}{bet.race_number}R {formatBetType(bet.bet_type, bet.status)} {bet.horse_number}
-                      </span>
-                      <span className="ml-2 text-muted-foreground">
-                        {bet.odds_at_bet}倍
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 text-right">
-                    <div className="space-y-0.5">
-                      <div className="text-xs text-muted-foreground">
-                        EV={bet.ev.toFixed(3)} P={bet.model_prob.toFixed(3)} move={bet.move >= 0 ? "+" : ""}{bet.move.toFixed(3)}
+            <div className="space-y-4">
+              {(() => {
+                // レースごとにグループ化
+                const groups: Record<string, typeof bets> = {};
+                for (const bet of bets) {
+                  const key = `${bet.venue_name}${bet.race_number}R`;
+                  if (!groups[key]) groups[key] = [];
+                  groups[key].push(bet);
+                }
+                return Object.entries(groups).map(([raceLabel, raceBets]) => {
+                  const totalAmount = raceBets.reduce((s, b) => s + b.amount, 0);
+                  const totalPayout = raceBets.reduce((s, b) => s + (b.payout || 0), 0);
+                  const hasHit = raceBets.some(b => b.result === "hit");
+                  const hasMiss = raceBets.some(b => b.result === "miss");
+                  const isLive = raceBets.some(b => b.is_live);
+                  const trioEv = raceBets.find(b => b.bet_type === "sanrenpuku")?.ev;
+                  return (
+                    <div
+                      key={raceLabel}
+                      className={cn(
+                        "rounded-md border text-sm",
+                        hasHit && "border-green-300 bg-green-50 dark:border-green-800 dark:bg-green-950",
+                        hasMiss && !hasHit && "border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950",
+                      )}
+                    >
+                      {/* レースヘッダー */}
+                      <div className="flex items-center justify-between border-b px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          {hasHit ? (
+                            <TrendingUp className="h-4 w-4 text-green-600" />
+                          ) : hasMiss ? (
+                            <TrendingDown className="h-4 w-4 text-red-500" />
+                          ) : (
+                            <CircleDot className="h-4 w-4 text-muted-foreground" />
+                          )}
+                          <span className="font-medium">{raceLabel}</span>
+                          <Badge variant={isLive ? "destructive" : "secondary"} className="text-xs">
+                            {isLive ? "実投票" : "PAPER"}
+                          </Badge>
+                          {trioEv != null && (
+                            <span className="text-xs text-muted-foreground">トリオEV={trioEv.toFixed(2)}</span>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <span className="font-medium">{raceBets.length}点 {totalAmount.toLocaleString()}円</span>
+                          {totalPayout > 0 && (
+                            <span className="ml-2 font-bold text-green-600">→ {totalPayout.toLocaleString()}円</span>
+                          )}
+                        </div>
                       </div>
-                      <div>
-                        <span className="font-medium">{bet.amount}円</span>
-                        {bet.result === "hit" && (
-                          <span className="ml-1 font-bold text-green-600">
-                            → {bet.payout?.toLocaleString()}円
-                          </span>
-                        )}
-                        {bet.result === "miss" && bet.winner_number && (
-                          <span className="ml-1 text-red-500">
-                            1着:{bet.winner_number}番
-                          </span>
-                        )}
-                      </div>
+                      {/* 買い目テーブル */}
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b text-muted-foreground">
+                            <th className="px-3 py-1 text-left">券種</th>
+                            <th className="px-2 py-1 text-left">組合せ</th>
+                            <th className="px-2 py-1 text-right">オッズ</th>
+                            <th className="px-2 py-1 text-right">EV</th>
+                            <th className="px-2 py-1 text-right">金額</th>
+                            <th className="px-2 py-1 text-right">結果</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {raceBets.map((bet) => (
+                            <tr key={bet.id} className="border-b last:border-0">
+                              <td className="px-3 py-1">{formatBetType(bet.bet_type, bet.status)}</td>
+                              <td className="px-2 py-1 font-mono">{bet.horse_number}</td>
+                              <td className="px-2 py-1 text-right">{Number(bet.odds_at_bet).toFixed(1)}</td>
+                              <td className="px-2 py-1 text-right">{bet.ev.toFixed(2)}</td>
+                              <td className="px-2 py-1 text-right">{bet.amount}円</td>
+                              <td className="px-2 py-1 text-right">
+                                {bet.result === "hit" ? (
+                                  <span className="font-bold text-green-600">{bet.payout?.toLocaleString()}円</span>
+                                ) : bet.result === "miss" ? (
+                                  <span className="text-red-500">×</span>
+                                ) : (
+                                  <span className="text-muted-foreground">—</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                    <Badge variant={bet.is_live ? "destructive" : "secondary"}>
-                      {bet.is_live ? "実投票" : "PAPER"}
-                    </Badge>
-                  </div>
+                  );
+                });
+              })()}
                 </div>
               ))}
             </div>
