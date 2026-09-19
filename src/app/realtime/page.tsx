@@ -554,8 +554,6 @@ export default function RealtimePage() {
                   );
                 });
               })()}
-                </div>
-              ))}
             </div>
           )}
         </CardContent>
