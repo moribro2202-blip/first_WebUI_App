@@ -79,7 +79,7 @@ def apply_odds_calibration(est_odds, cal_table):
 def select_best_bets(horses, win_probs, odds_3min, odds_5min,
                      trio_model=None, trio_config=None, race_data=None,
                      exotic_models=None, exotic_config=None,
-                     ev_threshold=1.2, race_budget=1000):
+                     ev_threshold=1.2, ev_threshold_trio=1.0, race_budget=1000):
     """1レースで最適な券種と買い目を選択 (v23)
 
     Args:
@@ -178,7 +178,7 @@ def select_best_bets(horses, win_probs, odds_3min, odds_5min,
     candidates['umaren'] = um_cands
 
     # --- 三連複（トリオ残差モデル or SHのみ、1番人気含む、EV>=1.0）---
-    TRIO_EV_THRESHOLD = 1.0
+    TRIO_EV_THRESHOLD = ev_threshold_trio
     trio_cands = []
     tr_model = exotic_models.get('trio') if exotic_models else trio_model
     tr_info = exotic_config.get('models',{}).get('trio',{}) if exotic_config else (trio_config or {})

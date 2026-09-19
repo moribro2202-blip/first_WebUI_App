@@ -14,6 +14,7 @@ type Config = {
   mode: string;
   amount: string;
   ev_threshold: string;
+  ev_threshold_trio: string;
   odds_min: string;
   odds_max: string;
 };
@@ -112,6 +113,7 @@ export default function RealtimePage() {
   const [editMode, setEditMode] = useState<string>("");
   const [editAmount, setEditAmount] = useState<string>("");
   const [editThreshold, setEditThreshold] = useState<string>("");
+  const [editThresholdTrio, setEditThresholdTrio] = useState<string>("");
 
   const fetchData = useCallback(async () => {
     try {
@@ -252,9 +254,9 @@ export default function RealtimePage() {
               )}
             </div>
 
-            {/* EV閾値 */}
+            {/* 単勝EV閾値 */}
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">EV閾値:</span>
+              <span className="text-sm text-muted-foreground">単勝EV閾値:</span>
               {editMode === "threshold" ? (
                 <form
                   className="flex gap-1"
@@ -281,6 +283,39 @@ export default function RealtimePage() {
                   onClick={() => { setEditThreshold(config?.ev_threshold || "1.20"); setEditMode("threshold"); }}
                 >
                   {config?.ev_threshold}
+                </Button>
+              )}
+            </div>
+
+            {/* トリオEV閾値 */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">トリオEV閾値:</span>
+              {editMode === "threshold_trio" ? (
+                <form
+                  className="flex gap-1"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    updateConfig({ ev_threshold_trio: editThresholdTrio });
+                    setEditMode("");
+                  }}
+                >
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={editThresholdTrio}
+                    onChange={(e) => setEditThresholdTrio(e.target.value)}
+                    className="w-20 rounded border px-2 py-1 text-sm"
+                    autoFocus
+                  />
+                  <Button size="sm" type="submit" disabled={saving}>OK</Button>
+                </form>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => { setEditThresholdTrio(config?.ev_threshold_trio || "1.0"); setEditMode("threshold_trio"); }}
+                >
+                  {config?.ev_threshold_trio || "1.0"}
                 </Button>
               )}
             </div>

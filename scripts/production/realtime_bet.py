@@ -699,6 +699,7 @@ def main():
     # コマンドライン引数よりDBの設定を優先（引数はフォールバック）
     is_live = rt_config.get('mode') == 'live' or args.live
     ev_threshold = float(rt_config.get('ev_threshold', args.threshold))
+    ev_threshold_trio = float(rt_config.get('ev_threshold_trio', '1.0'))
     race_budget = int(rt_config.get('amount', args.amount))  # 1レースあたりの予算
 
     print("=" * 60)
@@ -896,7 +897,8 @@ def main():
             odds_3min=odds_judge, odds_5min=odds_early,
             trio_model=trio_model, trio_config=trio_config, race_data=race_data,
             exotic_models=exotic_models, exotic_config=exotic_config,
-            ev_threshold=ev_threshold, race_budget=race_budget)
+            ev_threshold=ev_threshold, ev_threshold_trio=ev_threshold_trio,
+            race_budget=race_budget)
 
         best_type = selection['best_type']
         best_bets = selection['bets']

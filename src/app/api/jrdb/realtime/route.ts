@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const db = getDb();
 
-    const allowedKeys = ["mode", "amount", "ev_threshold", "odds_min", "odds_max"];
+    const allowedKeys = ["mode", "amount", "ev_threshold", "ev_threshold_trio", "odds_min", "odds_max"];
     let updated = 0;
 
     for (const key of allowedKeys) {
