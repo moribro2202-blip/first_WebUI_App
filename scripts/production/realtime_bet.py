@@ -877,6 +877,19 @@ def main():
         odds_judge = odds_all.get('3min', odds_all['5min'])
         odds_early = odds_all['5min']
 
+        # === 既投票チェック（再起動時の重複防止）===
+        try:
+            db_check = sqlite3.connect(DB_PATH)
+            existing = db_check.execute(
+                "SELECT COUNT(*) FROM realtime_bets WHERE race_id=? AND status != 'no_bet'", (rid,)
+            ).fetchone()[0]
+            db_check.close()
+            if existing > 0:
+                log(f"{label} 既に{existing}件投票済み、スキップ")
+                continue
+        except:
+            pass
+
         # 特徴量構築（3分前オッズで市場確率）
         race_data = build_features(race, odds_judge, config, stats)
         if race_data is None:
