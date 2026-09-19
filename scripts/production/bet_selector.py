@@ -300,7 +300,7 @@ def select_best_bets(horses, win_probs, odds_3min, odds_5min,
                         st_est_odds = (1/st_prob) * (1-TAKEOUT['sanrentan']) if st_prob > 0 else 0
                         bets.append({
                             'combo': f'{first}-{second}-{third}',
-                            'ev': float(st_prob * st_est_odds) if st_prob > 0 else 0.0,
+                            'ev': float(tc['ev']),  # トリオのEV（三連複モデル由来）
                             'model_prob': float(st_prob),
                             'est_odds': float(st_est_odds),
                             'bet_type': 'sanrentan',

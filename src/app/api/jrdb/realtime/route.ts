@@ -26,13 +26,13 @@ export async function GET() {
 
   // 本日の投票記録（no_betは除外）
   const bets = db.prepare(`
-    SELECT id, race_id, venue_name, race_number, horse_number, amount,
+    SELECT id, race_id, venue_name, race_number, horse_number, bet_type, amount,
            odds_at_bet, model_prob, ev, move, status, is_live, result,
            payout, confirmed_odds, winner_number, settled_at, created_at
     FROM realtime_bets WHERE race_date=? AND status != 'no_bet' ORDER BY created_at DESC
   `).all(today) as Array<{
     id: number; race_id: string; venue_name: string; race_number: number;
-    horse_number: number; amount: number; odds_at_bet: number;
+    horse_number: number; bet_type: string | null; amount: number; odds_at_bet: number;
     model_prob: number; ev: number; move: number; status: string;
     is_live: number; result: string | null; payout: number | null;
     confirmed_odds: number | null; winner_number: number | null;

@@ -23,7 +23,8 @@ type Bet = {
   id: number;
   venue_name: string;
   race_number: number;
-  horse_number: number;
+  horse_number: number | string;
+  bet_type: string | null;
   amount: number;
   odds_at_bet: number;
   model_prob: number;
@@ -486,10 +487,10 @@ export default function RealtimePage() {
                     )}
                     <div>
                       <span className="font-medium">
-                        {bet.venue_name}{bet.race_number}R 馬番{bet.horse_number}
+                        {bet.venue_name}{bet.race_number}R {formatBetType(bet.bet_type, bet.status)} {bet.horse_number}
                       </span>
                       <span className="ml-2 text-muted-foreground">
-                        単勝 {bet.odds_at_bet}倍
+                        {bet.odds_at_bet}倍
                       </span>
                     </div>
                   </div>
@@ -680,6 +681,17 @@ export default function RealtimePage() {
       </Card>
     </div>
   );
+}
+
+function formatBetType(betType: string | null, status: string): string {
+  const isPaper = status?.includes("paper");
+  const suffix = isPaper ? "(P)" : "";
+  switch (betType) {
+    case "win": return `単勝${suffix}`;
+    case "sanrenpuku": return `三連複${suffix}`;
+    case "sanrentan": return `三連単${suffix}`;
+    default: return `${betType || "単勝"}${suffix}`;
+  }
 }
 
 function parseTimeToDate(timeStr: string | null): Date | null {
