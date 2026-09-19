@@ -263,6 +263,11 @@ def select_best_bets(horses, win_probs, odds_3min, odds_5min,
             remaining_budget -= cost_per_trio
 
         if selected_trios:
+            # 総点数を計算して1点あたりの金額を決定（100円単位切り下げ）
+            pts_per_trio = 5 if n >= 12 else 1
+            total_pts = len(selected_trios) * pts_per_trio
+            per_bet = max(100, (race_budget // total_pts // 100) * 100)
+
             bets = []
             for tc in selected_trios:
                 combo_hns = [int(x) for x in tc['combo'].split('-')]
@@ -287,7 +292,6 @@ def select_best_bets(horses, win_probs, odds_3min, odds_5min,
                         (taikou_hn, anaume_hn, honmei_hn),  # ○→▲→◎
                     ]
                     for first, second, third in sanrentan_combos:
-                        # 三連単の確率とオッズを推定
                         i1 = hn_to_idx.get(first)
                         i2 = hn_to_idx.get(second)
                         i3 = hn_to_idx.get(third)
@@ -300,7 +304,7 @@ def select_best_bets(horses, win_probs, odds_3min, odds_5min,
                             'model_prob': float(st_prob),
                             'est_odds': float(st_est_odds),
                             'bet_type': 'sanrentan',
-                            'amount': 100,
+                            'amount': per_bet,
                             'trio_origin': tc['combo'],
                         })
 
@@ -311,7 +315,7 @@ def select_best_bets(horses, win_probs, odds_3min, odds_5min,
                         'model_prob': float(tc['model_prob']),
                         'est_odds': float(tc['est_odds']),
                         'bet_type': 'sanrenpuku',
-                        'amount': 100,
+                        'amount': per_bet,
                         'trio_origin': tc['combo'],
                     })
                 else:
@@ -322,7 +326,7 @@ def select_best_bets(horses, win_probs, odds_3min, odds_5min,
                         'model_prob': float(tc['model_prob']),
                         'est_odds': float(tc['est_odds']),
                         'bet_type': 'sanrenpuku',
-                        'amount': 100,
+                        'amount': per_bet,
                         'trio_origin': tc['combo'],
                     })
 
