@@ -247,13 +247,16 @@ def select_best_bets(horses, win_probs, odds_3min, odds_5min,
     hn_to_idx = {h: i for i, h in enumerate(horses)}
 
     if trio_cands:
-        # 頭数による1トリオあたりのコスト
+        # 頭数による1トリオあたりのコスト・上限
         cost_per_trio = 500 if n >= 12 else 100  # 5点 or 1点
+        max_trios = 3 if n >= 12 else 5  # 投票時間制約: 12頭以上=max3(15点), 未満=max5(5点)
 
-        # EV順にrace_budget内で選択
+        # EV順にrace_budget内かつmax_trios以内で選択
         selected_trios = []
         remaining_budget = race_budget
         for tc in trio_cands:
+            if len(selected_trios) >= max_trios:
+                break
             if remaining_budget < cost_per_trio:
                 break
             selected_trios.append(tc)
